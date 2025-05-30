@@ -227,12 +227,28 @@ jobs:
         if: needs.check-for-new-versions.outputs.aermet_update_needed == 'true'
         id: download-aermet
         run: |
+          # Create downloads and checksums directories if they don't exist
+          mkdir -p downloads checksums
+
           echo "Downloading AERMET version ${{ needs.check-for-new-versions.outputs.aermet_new_version }}..."
           if bash scripts/fetch_latest_aermet.sh "${{ needs.check-for-new-versions.outputs.aermet_new_version }}"; then
-            echo "download_success=true" >> $GITHUB_OUTPUT
+            # Validate the downloaded file
+            if [ -f "downloads/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip" ]; then
+              file_size=$(stat -c%s "downloads/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip" || echo "0")
+              if [ "$file_size" -gt "1000" ]; then
+                echo "download_success=true" >> $GITHUB_OUTPUT
+                echo "Downloaded AERMET successfully ($(($file_size/1024))KB)"
+              else
+                echo "download_success=false" >> $GITHUB_OUTPUT
+                echo "Downloaded AERMET file is too small ($file_size bytes). Download may have failed or the file is empty."
+              fi
+            else
+              echo "download_success=false" >> $GITHUB_OUTPUT
+              echo "AERMET download failed, file not found: downloads/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip"
+            fi
           else
-            echo "::warning::Failed to download AERMET ${{ needs.check-for-new-versions.outputs.aermet_new_version }}"
             echo "download_success=false" >> $GITHUB_OUTPUT
+            echo "Failed to execute fetch_latest_aermet.sh for version ${{ needs.check-for-new-versions.outputs.aermet_new_version }}"
           fi
       
       - name: Extract AERMET checksum
@@ -283,12 +299,28 @@ jobs:
         if: needs.check-for-new-versions.outputs.aermap_update_needed == 'true'
         id: download-aermap
         run: |
+          # Create downloads and checksums directories if they don't exist
+          mkdir -p downloads checksums
+
           echo "Downloading AERMAP version ${{ needs.check-for-new-versions.outputs.aermap_new_version }}..."
           if bash scripts/fetch_latest_aermap.sh "${{ needs.check-for-new-versions.outputs.aermap_new_version }}"; then
-            echo "download_success=true" >> $GITHUB_OUTPUT
+            # Validate the downloaded file
+            if [ -f "downloads/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip" ]; then
+              file_size=$(stat -c%s "downloads/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip" || echo "0")
+              if [ "$file_size" -gt "1000" ]; then # Check if file size is greater than 1KB
+                echo "download_success=true" >> $GITHUB_OUTPUT
+                echo "Downloaded AERMAP successfully ($(($file_size/1024))KB)."
+              else
+                echo "download_success=false" >> $GITHUB_OUTPUT
+                echo "Downloaded AERMAP file is too small ($file_size bytes). Download may have failed or the file is empty."
+              fi
+            else
+              echo "download_success=false" >> $GITHUB_OUTPUT
+              echo "AERMAP download failed, file not found: downloads/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip"
+            fi
           else
-            echo "::warning::Failed to download AERMAP ${{ needs.check-for-new-versions.outputs.aermap_new_version }}"
             echo "download_success=false" >> $GITHUB_OUTPUT
+            echo "Failed to execute fetch_latest_aermap.sh for version ${{ needs.check-for-new-versions.outputs.aermap_new_version }}"
           fi
       
       - name: Extract AERMAP checksum
