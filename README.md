@@ -104,6 +104,27 @@ brew unpin aermet
 brew unpin aermap
 ```
 
+### Fetching Source Archives with Checksums
+
+For reproducible builds you can download the official AERMOD source and record
+its SHA-256 checksum. The `scripts/fetch_latest_aermod.sh` helper script
+automates this:
+
+```bash
+./scripts/fetch_latest_aermod.sh        # downloads the newest release
+# or specify a version number
+./scripts/fetch_latest_aermod.sh 24142
+
+# Afterwards add the new files to version control
+git add downloads/aermod_*.zip checksums/aermod_*.sha256
+git commit -m "Add AERMOD source and checksum"
+```
+
+When a new version is released update the script by changing the VERSION
+argument or letting it scrape the latest version from EPA's SCRAM website. The
+checksum files kept in `checksums/` allow others to verify they are building
+from the same archive.
+
 ## Technical Details
 
 These formulas compile the official EPA source code using gfortran (from GCC). The compilation process:
