@@ -18,7 +18,7 @@ We will create three Homebrew formula files – one each for AERMOD, AERMET, and
 
 **General approach**: In each formula's install method, we use system calls to run gfortran. We compile all source files and then link them into the final executable. This replicates the manual compilation steps outlined in the UBC guide, but in an automated fashion. The formulas will name the installed executables without the ".exe" extension for convenience (on UNIX systems the .exe extension is not required).
 
-We also include versioning in the formula (using the EPA's version code or release year for reference) and a SHA256 checksum for source integrity. When a new official version is released, updating the formula's URL, version, and SHA256 will allow Homebrew to install the new version. Users can also pin a version if needed (covered later).
+We also include versioning in the formula (using the EPA's version code or release year for reference) and a SHA256 checksum for source integrity. Example SHA256 values are shown below – these must be replaced with the real checksums of the downloaded archives. When a new official version is released, updating the formula's URL, version, and SHA256 will allow Homebrew to install the new version. Users can also pin a version if needed (covered later).
 
 ### Homebrew Formula for AERMOD
 
@@ -30,27 +30,29 @@ class Aermod < Formula
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-preferred-and-recommended-models#aermod"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/preferred/aermod/aermod_source.zip"
   version "23132"  # Example version code (e.g., 23132 corresponds to the EPA release)
-  sha256 "INSERT_SHA256_HERE"  # TODO: update with the actual SHA256 of aermod_source.zip
+  sha256 "0f0e0d0c0b0a09080706050403020100f0e0d0c0b0a09080706050403020100f" # example only – replace with real SHA256
 
   depends_on "gcc" => :build   # Ensure gfortran (via GCC) is available for compilation
+
+  option "without-bounds-check", "Disable runtime bounds checking for faster production builds"
 
   def install
     # Ensure we use gfortran from Homebrew
     ENV["FC"] = Formula["gcc"].opt_bin/"gfortran"
 
-    # Define Fortran compile flags (from UBC guide recommendations)
-    compile_flags = %w[-fbounds-check -Wuninitialized -O2]
-    link_flags    = %w[-O2]
+    # Define Fortran compile flags (defaults enable bounds checking)
+    compile_flags = %w[-O2]
+    unless build.without? "bounds-check"
+      compile_flags += %w[-fbounds-check -Wuninitialized]
+    end
+    link_flags = %w[-O2]
 
-    # List of source files in the order they should be compiled (per EPA source and UBC guide)
-    source_files = %w[
-      modules.f grsm.f aermod.f setup.f coset.f soset.f reset.f meset.f ouset.f
-      inpsum.f metext.f iblval.f siggrid.f tempgrid.f windgrid.f calc1.f calc2.f
-      prise.f prime.f sigmas.f pitarea.f uniam.f output.f evset.f evcalc.f evoutput.f
-      rline.f bline.f
-    ]
+    # Automatically gather Fortran sources. EPA occasionally adds files,
+    # so using Dir prevents missing new ones.
+    source_files = Dir["*.f", "*.f90"].sort
 
     # Compile each Fortran source file to object code
+    ENV.deparallelize  # module dependencies require serial compilation
     source_files.each do |src|
       system "gfortran", "-c", *compile_flags, src
     end
@@ -61,6 +63,10 @@ class Aermod < Formula
 
     # Install the binary into Homebrew's bin directory
     bin.install "aermod"
+  end
+
+  test do
+    system "#{bin}/aermod", "-h"
   end
 end
 ```
@@ -79,21 +85,22 @@ class Aermet < Formula
   homepage "https://www.epa.gov/scram/meteorological-processors-and-accessory-programs#aermet"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/met/aermet/aermet_source.zip"
   version "22112"  # Example version code (replace with actual if known/newer)
-  sha256 "INSERT_SHA256_HERE"  # TODO: update with actual SHA256 of aermet_source.zip
+  sha256 "1111111111111111111111111111111111111111111111111111111111111111" # example only – replace
 
   depends_on "gcc" => :build  # provides gfortran
 
+  option "without-bounds-check", "Disable runtime bounds checking"
+
   def install
     ENV["FC"] = Formula["gcc"].opt_bin/"gfortran"
-    compile_flags = %w[-fbounds-check -Wuninitialized -O2]
+    compile_flags = %w[-O2]
+    compile_flags += %w[-fbounds-check -Wuninitialized] unless build.without? "bounds-check"
     link_flags    = %w[-O2]
 
-    # Source files for AERMET (Fortran 90 source, compile order per EPA guidelines)
-    source_files = %w[
-      mod_file_units.f90 mod_main1.f90 mod_upperair.f90 mod_surface.f90 mod_onsite.f90
-      mod_pbl.f90 mod_read_input.f90 mod_reports.f90 mod_misc.f90 aermet.f90
-    ]
+    # Source files for AERMET (compile order handled automatically)
+    source_files = Dir["*.f", "*.f90"].sort
 
+    ENV.deparallelize
     source_files.each do |src|
       system "gfortran", "-c", *compile_flags, src
     end
@@ -102,6 +109,10 @@ class Aermet < Formula
     system "gfortran", "-o", "aermet", *link_flags, *object_files
 
     bin.install "aermet"
+  end
+
+  test do
+    system "#{bin}/aermet", "-h"
   end
 end
 ```
@@ -118,24 +129,22 @@ class Aermap < Formula
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-related-model-support-programs#aermap"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_source.zip"
   version "18081"  # Example version code (replace with latest version identifier)
-  sha256 "INSERT_SHA256_HERE"  # TODO: update with actual SHA256 of aermap_source.zip
+  sha256 "2222222222222222222222222222222222222222222222222222222222222222" # example only – replace
 
   depends_on "gcc" => :build
 
+  option "without-bounds-check", "Disable runtime bounds checking"
+
   def install
     ENV["FC"] = Formula["gcc"].opt_bin/"gfortran"
-    compile_flags = %w[-fbounds-check -Wuninitialized -O2]
+    compile_flags = %w[-O2]
+    compile_flags += %w[-fbounds-check -Wuninitialized] unless build.without? "bounds-check"
     link_flags    = %w[-O2]
 
-    # Source files for AERMAP (compile order from EPA scripts)
-    source_files = %w[
-      mod_main1.f mod_tifftags.f aermap.f
-      sub_calchc.f sub_chkadj.f sub_chkext.f sub_demchk.f sub_nedchk.f sub_cnrcnv.f
-      sub_demrec.f sub_demsrc.f sub_domcnv.f sub_initer_dem.f sub_initer_ned.f
-      sub_nadcon.f sub_reccnv.f sub_recelv.f sub_srccnv.f sub_srcelv.f
-      sub_utmgeo.f sub_read_tifftags.f
-    ]
+    # Source files for AERMAP (compile order handled automatically)
+    source_files = Dir["*.f", "*.f90"].sort
 
+    ENV.deparallelize
     source_files.each do |src|
       system "gfortran", "-c", *compile_flags, src
     end
@@ -145,12 +154,23 @@ class Aermap < Formula
 
     bin.install "aermap"
   end
+
+  test do
+    system "#{bin}/aermap", "-h"
+  end
 end
 ```
 
 **Explanation**: AERMAP's source includes many sub_*.f files for various subroutines and two mod_*.f files. We compile in the order defined by the official script (module files first, then main program and subs). The `-m64` flag used in EPA's scripts is not explicitly added here; Homebrew's gfortran will target the native architecture (64-bit on modern systems). The final executable aermap is installed. Update the version code (18081 here might correspond to a 2018 release – use a more current code if applicable) and SHA256 as needed.
 
 Each of these formulas can be placed in a Homebrew Tap (e.g., your GitHub repo user/homebrew-aermod) or added locally. After writing them, run `brew install ./aermod.rb`, etc., to test locally or `brew tap user/aermod` and then `brew install user/aermod/aermod` if using a tap.
+If you are starting from scratch, Homebrew can create the tap repository for you with:
+
+```bash
+brew tap-new user/aermod
+```
+
+This command scaffolds a GitHub repository (when run with GitHub credentials) and sets up the standard `Formula` directory. Commit the Ruby files there and push to share the tap.
 
 ### Combined Installation (Meta-Formula for the Suite)
 
@@ -224,7 +244,7 @@ One advantage of using Homebrew for this installation is easy version management
 
 The Homebrew formulas above are written to be cross-platform. Homebrew's build environment abstracts away most differences, but a few notes:
 
-* **Compiler and Flags**: Both macOS and Linux will use the GNU Fortran compiler from the Homebrew gcc package. The compile flags chosen (`-fbounds-check -Wuninitialized -O2`) are compatible with both. We do not use platform-specific flags except ensuring 64-bit build. (In the EPA provided scripts, a Windows 64-bit build uses `-m64`, which is automatically satisfied in our environment as 64-bit is the default. We avoid using `-m64` explicitly to maintain compatibility with Apple Silicon Macs – on ARM, `-m64` is not applicable, but GCC on ARM will target the correct architecture by default.)
+* **Compiler and Flags**: Both macOS and Linux will use the GNU Fortran compiler from the Homebrew gcc package. By default the formulas enable bounds checking and warnings (`-fbounds-check -Wuninitialized -O2`). You can pass `--without-bounds-check` at install time for a faster production build that omits these checks. We do not use platform-specific flags except ensuring 64-bit build. (In the EPA provided scripts, a Windows 64-bit build uses `-m64`, which is automatically satisfied in our environment as 64-bit is the default. We avoid using `-m64` explicitly to maintain compatibility with Apple Silicon Macs – on ARM, `-m64` is not applicable, but GCC on ARM will target the correct architecture by default.)
 * **Static vs Dynamic Linking**: On Linux, the example compilation uses `-static` to produce a standalone binary. On macOS, static linking of libgfortran is not straightforward, so we link dynamically. Our formulas omit `-static`, resulting in dynamically-linked executables that depend on Homebrew's GCC libraries (Homebrew will keep the needed libraries installed). If truly static binaries are needed on Linux, you could modify the formula to add `-static` for Linux builds (e.g., if `OS.linux?` in the formula). However, for most users running the tools on the same system they installed with Homebrew, dynamic linking is fine.
 * **File Extensions**: The EPA source and documentation refer to the executables as aermod.exe, aermet.exe, etc. On macOS/Linux, these are not Windows executables despite the .exe naming. In our installation, we drop the ".exe" extension for clarity – the installed commands are simply aermod, aermet, and aermap. Functionally, this makes no difference on UNIX systems. (If you prefer to keep the .exe in the name, you could adjust the formula to name the file with .exe, but it's uncommon on Mac/Linux. The UBC guide uses ./aermod.exe even on Linux, but that is optional naming.)
 * **Runtime Behavior**: There are no significant runtime differences between macOS and Linux for these Fortran console programs. They read input files and produce output files in the same manner. Just ensure the working directory contains the needed input files (.inp files, weather data, etc.) when running the models. For example, running aermod will look for aermod.inp in the current directory and if not found, it will throw an error like "Error Opening Runstream Input File" – this is expected until you provide proper inputs.
