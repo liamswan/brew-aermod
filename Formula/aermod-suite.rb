@@ -1,6 +1,7 @@
 class AermodSuite < Formula
   desc "Meta-formula to install AERMOD and its preprocessors (AERMET, AERMAP)"
   homepage "https://www.epa.gov/scram"
+  license :public_domain
   version "2025"
   url "https://github.com/liamswan/brew-aermod/releases/download/v20250530/aermod-suite-2025.tar.gz"
   sha256 "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -14,8 +15,8 @@ class AermodSuite < Formula
   end
 
   test do
-    system "#{Formula["aermod"].bin}/aermod", "-h" rescue nil
-    system "#{Formula["aermet"].bin}/aermet", "-h" rescue nil
-    system "#{Formula["aermap"].bin}/aermap", "-h" rescue nil
+    assert_match "AERMOD", shell_output("#{Formula["aermod"].bin}/aermod -h 2>&1", 1)
+    assert_match "AERMET", shell_output("#{Formula["aermet"].bin}/aermet -h 2>&1", 1)
+    assert_match "AERMAP", shell_output("#{Formula["aermap"].bin}/aermap -h 2>&1", 1)
   end
 end
