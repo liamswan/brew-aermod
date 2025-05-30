@@ -39,5 +39,8 @@ class Aermod < Formula
   test do
     # Just check if the binary exists and is executable
     assert_predicate bin/"aermod", :executable?
+    
+    # Try running with -h flag (some versions may not support this)
+    system bin/"aermod", "-h" rescue nil
   end
 end

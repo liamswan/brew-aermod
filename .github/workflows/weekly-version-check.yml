@@ -1,0 +1,161 @@
+name: Weekly AERMOD Version Check
+
+on:
+  schedule:
+    # Run weekly on Monday at 1:00 AM UTC
+    - cron: '0 1 * * 1'
+  workflow_dispatch:
+    # Allow manual triggering for testing
+
+jobs:
+  check-for-new-version:
+    name: Check for new AERMOD version
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.version-check.outputs.new_version }}
+      current_version: ${{ steps.version-check.outputs.current_version }}
+      update_needed: ${{ steps.version-check.outputs.update_needed }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Check current and latest versions
+        id: version-check
+        run: |
+          # Get current version from formula
+          CURRENT_VERSION=$(grep -o 'version "[0-9]*"' Formula/aermod.rb | grep -o '[0-9]*')
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          
+          # Get latest version from EPA website
+          LATEST_VERSION=$(bash scripts/fetch_latest_aermod.sh --version-only)
+          echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          
+          # Compare versions
+          if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+            echo "update_needed=true" >> $GITHUB_OUTPUT
+            echo "New version detected: $LATEST_VERSION (current: $CURRENT_VERSION)"
+          else
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+            echo "No new version available. Current version: $CURRENT_VERSION"
+          fi
+
+  update-formula:
+    name: Update formula with new version
+    needs: check-for-new-version
+    if: needs.check-for-new-version.outputs.update_needed == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Download new version
+        run: |
+          echo "Downloading AERMOD version ${{ needs.check-for-new-version.outputs.new_version }}..."
+          bash scripts/fetch_latest_aermod.sh
+      
+      - name: Extract checksum
+        id: extract-checksum
+        run: |
+          CHECKSUM=$(cat checksums/aermod_${{ needs.check-for-new-version.outputs.new_version }}.sha256)
+          echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
+      
+      - name: Update formula file
+        run: |
+          NEW_VERSION="${{ needs.check-for-new-version.outputs.new_version }}"
+          CHECKSUM="${{ steps.extract-checksum.outputs.checksum }}"
+          
+          # Update version and checksum in aermod.rb
+          sed -i "s/version \"[0-9]*\"/version \"$NEW_VERSION\"/" Formula/aermod.rb
+          sed -i "s/sha256 \"[a-f0-9]*\"/sha256 \"$CHECKSUM\"/" Formula/aermod.rb
+          
+          # Create versioned formula if it doesn't exist
+          if [ ! -f "Formula/aermod@$NEW_VERSION.rb" ]; then
+            cp Formula/aermod.rb "Formula/aermod@$NEW_VERSION.rb"
+            sed -i "s/class Aermod < Formula/class AermodAT$NEW_VERSION < Formula/" "Formula/aermod@$NEW_VERSION.rb"
+          fi
+      
+      - name: Update aermod-suite formula
+        run: |
+          NEW_VERSION="${{ needs.check-for-new-version.outputs.new_version }}"
+          # Update the suite version to the current year
+          CURRENT_YEAR=$(date +%Y)
+          sed -i "s/version \"[0-9]*\"/version \"$CURRENT_YEAR\"/" Formula/aermod-suite.rb
+      
+      - name: Commit and push changes
+        run: |
+          NEW_VERSION="${{ needs.check-for-new-version.outputs.new_version }}"
+          
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          git add downloads/aermod_$NEW_VERSION.zip
+          git add checksums/aermod_$NEW_VERSION.sha256
+          git add Formula/aermod.rb
+          git add Formula/aermod-suite.rb
+          git add Formula/aermod@$NEW_VERSION.rb
+          
+          git commit -m "Update AERMOD to version $NEW_VERSION [automated]"
+          git push
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.check-for-new-version.outputs.new_version }}
+          name: AERMOD v${{ needs.check-for-new-version.outputs.new_version }}
+          body: |
+            Automated release of AERMOD version ${{ needs.check-for-new-version.outputs.new_version }}
+            
+            ## Installation
+            
+            ```bash
+            # Install latest version
+            brew install liamswan/brew-aermod/aermod
+            
+            # Or install this specific version
+            brew install liamswan/brew-aermod/aermod@${{ needs.check-for-new-version.outputs.new_version }}
+            ```
+          files: |
+            downloads/aermod_${{ needs.check-for-new-version.outputs.new_version }}.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test-formula:
+    name: Test updated formula
+    needs: [check-for-new-version, update-formula]
+    runs-on: macos-latest
+    
+    steps:
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+      
+      - name: Add tap
+        run: |
+          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
+      
+      - name: Install formula
+        run: |
+          brew install --verbose liamswan/brew-aermod/aermod
+      
+      - name: Test formula
+        run: |
+          brew test liamswan/brew-aermod/aermod
+      
+      - name: Create success comment
+        if: success()
+        uses: peter-evans/create-or-update-comment@v2
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ✅ Successfully updated and tested AERMOD to version ${{ needs.check-for-new-version.outputs.new_version }}
+            
+            The new version is now available for installation:
+            ```bash
+            brew install liamswan/brew-aermod/aermod
+            ```
