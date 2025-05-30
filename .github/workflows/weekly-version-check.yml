@@ -9,7 +9,7 @@ on:
       force_run:
         description: 'Force run update and test jobs even if no new versions are found'
         required: false
-        default: false
+        default: false # Ensure default is a boolean
         type: boolean
 
 permissions:
@@ -148,6 +148,7 @@ jobs:
   update-formulas:
     name: Update formulas with new versions
     needs: check-for-new-versions
+    # Run if any component has an update OR if force_run is explicitly true
     if: needs.check-for-new-versions.outputs.any_updates == 'true' || github.event.inputs.force_run == true
     runs-on: ubuntu-latest
     
@@ -157,6 +158,7 @@ jobs:
       
       # Download and update AERMOD if needed
       - name: Download new AERMOD version
+        # This step only runs if an update for AERMOD is actually needed
         if: needs.check-for-new-versions.outputs.aermod_update_needed == 'true'
         id: download-aermod
         run: |
@@ -542,11 +544,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
   test-formulas:
-    name: Test updated formulas
+    name: Install and test formulas
     needs: [check-for-new-versions, update-formulas]
-    if: (needs.check-for-new-versions.outputs.any_updates == 'true' || github.event.inputs.force_run == true) && always() # ensure it runs if update-formulas ran or was skipped but we forced
-    runs-on: macos-latest
-    
+    if: (needs.check-for-new-versions.outputs.any_updates == 'true' || github.event.inputs.force_run == true) && always()
+    runs-on: macos-latest # Or specific macOS version if needed
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest]
     steps:
       - name: Set up Homebrew
         id: set-up-homebrew
@@ -557,26 +562,29 @@ jobs:
           brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
           brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
       
-      # Test AERMOD if updated
+      # Test AERMOD if updated or force_run is true
       - name: Install and test AERMOD
         if: needs.check-for-new-versions.outputs.aermod_update_needed == 'true' || github.event.inputs.force_run == true
         run: |
-          brew install --verbose liamswan/brew-aermod/aermod
-          brew test liamswan/brew-aermod/aermod
+          echo "Testing AERMOD version: ${{ needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
+          brew test Formula/aermod.rb
+          # brew test Formula/aermod@${{ needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}.rb
       
-      # Test AERMET if updated
+      # Test AERMET if updated or force_run is true
       - name: Install and test AERMET
         if: needs.check-for-new-versions.outputs.aermet_update_needed == 'true' || github.event.inputs.force_run == true
         run: |
-          brew install --verbose liamswan/brew-aermod/aermet
-          brew test liamswan/brew-aermod/aermet
+          echo "Testing AERMET version: ${{ needs.check-for-new-versions.outputs.aermet_new_version || needs.check-for-new-versions.outputs.aermet_current_version }}"
+          brew test Formula/aermet.rb
+          # brew test Formula/aermet@${{ needs.check-for-new-versions.outputs.aermet_new_version || needs.check-for-new-versions.outputs.aermet_current_version }}.rb
       
-      # Test AERMAP if updated
+      # Test AERMAP if updated or force_run is true
       - name: Install and test AERMAP
         if: needs.check-for-new-versions.outputs.aermap_update_needed == 'true' || github.event.inputs.force_run == true
         run: |
-          brew install --verbose liamswan/brew-aermod/aermap
-          brew test liamswan/brew-aermod/aermap
+          echo "Testing AERMAP version: ${{ needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}"
+          brew test Formula/aermap.rb
+          # brew test Formula/aermap@${{ needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}.rb
       
       # Create success comment
       - name: Create success notification
@@ -598,3 +606,50 @@ jobs:
           echo ""
           echo "The new versions are now available for installation:"
           echo "brew install liamswan/brew-aermod/aermod-suite"
+
+  create-issue-on-failure:
+    name: Create Issue on Failure
+    needs: [check-for-new-versions, update-formulas, test-formulas]
+    if: failure() && (needs.check-for-new-versions.outputs.any_updates == 'true' || github.event.inputs.force_run == true)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Prepare issue content
+        id: prepare-issue
+        run: |
+          echo "### ⚠️ AERMOD Suite Update Workflow Failed" > ./workflow_failure_issue.md
+          echo "" >> ./workflow_failure_issue.md
+          echo "The automated weekly update and testing workflow for the AERMOD Suite Homebrew formulas has failed." >> ./workflow_failure_issue.md
+          echo "" >> ./workflow_failure_issue.md
+          echo "**Details:**" >> ./workflow_failure_issue.md
+          echo "- **Trigger:** ${{ github.event_name }}" >> ./workflow_failure_issue.md
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "- **Force Run:** ${{ github.event.inputs.force_run }}" >> ./workflow_failure_issue.md
+          fi
+          echo "- **Run ID:** ${{ github.run_id }}" >> ./workflow_failure_issue.md
+          echo "- **Run Attempt:** ${{ github.run_attempt }}" >> ./workflow_failure_issue.md
+          echo "- **Link to Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> ./workflow_failure_issue.md
+          echo "" >> ./workflow_failure_issue.md
+          echo "**Failed Job(s):**" >> ./workflow_failure_issue.md
+          if [ "${{ needs.check-for-new-versions.result }}" == "failure" ]; then
+            echo "  - check-for-new-versions" >> ./workflow_failure_issue.md
+          fi
+          if [ "${{ needs.update-formulas.result }}" == "failure" ]; then
+            echo "  - update-formulas" >> ./workflow_failure_issue.md
+          fi
+          if [ "${{ needs.test-formulas.result }}" == "failure" ]; then
+            echo "  - test-formulas" >> ./workflow_failure_issue.md
+          fi
+          echo "" >> ./workflow_failure_issue.md
+          echo "Please investigate the workflow logs for more details." >> ./workflow_failure_issue.md
+
+      - name: Create Issue from File
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: "AERMOD Suite Update Workflow Failed (${{ github.run_id }})"
+          content-filepath: ./workflow_failure_issue.md # Corrected to content-filepath
+          labels: bug, automation, workflow-failure
+          assignees: liamswan
