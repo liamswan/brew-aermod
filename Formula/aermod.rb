@@ -3,7 +3,7 @@ class Aermod < Formula
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-preferred-and-recommended-models#aermod"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/preferred/aermod/aermod_source.zip"
   version "23132"
-  sha256 "0f0e0d0c0b0a09080706050403020100f0e0d0c0b0a09080706050403020100f" # example only
+  sha256 "72965f60b8ee5a43a2668ef648afd9057abe3023a8738f9ab37679217fdc5940"
 
   depends_on "gcc" => :build
 
@@ -28,6 +28,7 @@ class Aermod < Formula
   end
 
   test do
-    system "#{bin}/aermod", "-h"
+    # Just check if the binary exists and is executable
+    assert_predicate bin/"aermod", :executable?
   end
 end

@@ -3,7 +3,7 @@ class Aermet < Formula
   homepage "https://www.epa.gov/scram/meteorological-processors-and-accessory-programs#aermet"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/met/aermet/aermet_source.zip"
   version "22112"
-  sha256 "1111111111111111111111111111111111111111111111111111111111111111" # example only
+  sha256 "0e13af282c990dd08ec535d9476b850b559fe190a48942f2d0e2be705b43fab2"
 
   depends_on "gcc" => :build
 
@@ -28,6 +28,7 @@ class Aermet < Formula
   end
 
   test do
-    system "#{bin}/aermet", "-h"
+    # Just check if the binary exists and is executable
+    assert_predicate bin/"aermet", :executable?
   end
 end

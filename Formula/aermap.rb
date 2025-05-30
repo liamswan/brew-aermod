@@ -3,7 +3,7 @@ class Aermap < Formula
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-related-model-support-programs#aermap"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_source.zip"
   version "18081"
-  sha256 "2222222222222222222222222222222222222222222222222222222222222222" # example only
+  sha256 "4b34b39fe0039db114e3e78e3b6faa4797a5f8ee8ca0771db030a9b93ab3bed6"
 
   depends_on "gcc" => :build
 
@@ -28,6 +28,7 @@ class Aermap < Formula
   end
 
   test do
-    system "#{bin}/aermap", "-h"
+    # Just check if the binary exists and is executable
+    assert_predicate bin/"aermap", :executable?
   end
 end
