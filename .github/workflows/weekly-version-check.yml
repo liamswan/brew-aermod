@@ -567,24 +567,24 @@ jobs:
         if: needs.check-for-new-versions.outputs.aermod_update_needed == 'true' || github.event.inputs.force_run == 'true'
         run: |
           echo "Testing AERMOD version: ${{ needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
-          brew test Formula/aermod.rb
-          # brew test Formula/aermod@${{ needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}.rb
+          brew install --formula liamswan/brew-aermod/aermod
+          brew test liamswan/brew-aermod/aermod
       
       # Test AERMET if updated or force_run is true
       - name: Install and test AERMET
         if: needs.check-for-new-versions.outputs.aermet_update_needed == 'true' || github.event.inputs.force_run == 'true'
         run: |
           echo "Testing AERMET version: ${{ needs.check-for-new-versions.outputs.aermet_new_version || needs.check-for-new-versions.outputs.aermet_current_version }}"
-          brew test Formula/aermet.rb
-          # brew test Formula/aermet@${{ needs.check-for-new-versions.outputs.aermet_new_version || needs.check-for-new-versions.outputs.aermet_current_version }}.rb
+          brew install --formula liamswan/brew-aermod/aermet
+          brew test liamswan/brew-aermod/aermet
       
       # Test AERMAP if updated or force_run is true
       - name: Install and test AERMAP
         if: needs.check-for-new-versions.outputs.aermap_update_needed == 'true' || github.event.inputs.force_run == 'true'
         run: |
           echo "Testing AERMAP version: ${{ needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}"
-          brew test Formula/aermap.rb
-          # brew test Formula/aermap@${{ needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}.rb
+          brew install --formula liamswan/brew-aermod/aermap
+          brew test liamswan/brew-aermod/aermap
       
       # Create success comment
       - name: Create success notification
