@@ -567,24 +567,176 @@ jobs:
         if: needs.check-for-new-versions.outputs.aermod_update_needed == 'true' || github.event.inputs.force_run == 'true'
         run: |
           echo "Testing AERMOD version: ${{ needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
-          brew install --formula liamswan/brew-aermod/aermod
-          brew test liamswan/brew-aermod/aermod
+          
+          # Diagnostic: Check downloaded files
+          echo "Checking ZIP file contents before installation:"
+          VERSION="${{ needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
+          brew tap-new liamswan/brew-aermod
+          brew fetch --force liamswan/brew-aermod/aermod
+          CACHE_PATH=$(brew --cache)
+          echo "Homebrew cache path: $CACHE_PATH"
+          ls -la $CACHE_PATH
+          
+          # Look for any AERMOD downloaded files
+          find $CACHE_PATH -name "*aermod*" -o -name "*AERMOD*" | sort
+          
+          # Check contents of any found zip files
+          ZIP_FILES=$(find $CACHE_PATH -name "*aermod*.zip" -o -name "*AERMOD*.zip")
+          if [ -n "$ZIP_FILES" ]; then
+            for zip_file in $ZIP_FILES; do
+              echo "Contents of $zip_file:"
+              unzip -l "$zip_file" | head -n 20
+              
+              # Check for the source code directory
+              echo "Looking for aermod_source_code_$VERSION in $zip_file:"
+              unzip -l "$zip_file" | grep -i "aermod_source_code" || echo "No aermod_source_code directory found in $zip_file"
+            done
+          else
+            echo "No AERMOD ZIP files found in cache"
+          fi
+          
+          # Install AERMOD with verbose output
+          echo "Installing AERMOD with verbose output:"
+          HOMEBREW_CURL_VERBOSE=1 brew install -v liamswan/brew-aermod/aermod
+          
+          # Check what happened after installation
+          echo "AERMOD installation directories:"
+          ls -la $(brew --cellar)/aermod
+          
+          # Check what's in the installed formula directory
+          CELLAR_PATH=$(brew --cellar)/aermod/*
+          echo "Contents of AERMOD cellar directory:"
+          find $CELLAR_PATH -type f | grep -v "\.o$" | sort
+          
+          # Look for source code directories
+          echo "Looking for source code directory in Cellar:"
+          find $CELLAR_PATH -type d -name "*source*" -o -name "*aermod*" | sort
+          
+          # Try to run test with verbose output
+          echo "Running brew test with verbose output:"
+          brew test -v liamswan/brew-aermod/aermod || {
+            echo "Test failed. Checking environment:"
+            echo "Current directory: $(pwd)"
+            ls -la
+            echo "AERMOD formula content:"
+            cat $(brew formula liamswan/brew-aermod/aermod)
+          }
       
       # Test AERMET if updated or force_run is true
       - name: Install and test AERMET
         if: needs.check-for-new-versions.outputs.aermet_update_needed == 'true' || github.event.inputs.force_run == 'true'
         run: |
           echo "Testing AERMET version: ${{ needs.check-for-new-versions.outputs.aermet_new_version || needs.check-for-new-versions.outputs.aermet_current_version }}"
-          brew install --formula liamswan/brew-aermod/aermet
-          brew test liamswan/brew-aermod/aermet
+          
+          # Diagnostic: Check downloaded files
+          echo "Checking ZIP file contents before installation:"
+          VERSION="${{ needs.check-for-new-versions.outputs.aermet_new_version || needs.check-for-new-versions.outputs.aermet_current_version }}"
+          brew fetch --force liamswan/brew-aermod/aermet
+          CACHE_PATH=$(brew --cache)
+          echo "Homebrew cache path: $CACHE_PATH"
+          
+          # Look for any AERMET downloaded files
+          find $CACHE_PATH -name "*aermet*" -o -name "*AERMET*" | sort
+          
+          # Check contents of any found zip files
+          ZIP_FILES=$(find $CACHE_PATH -name "*aermet*.zip" -o -name "*AERMET*.zip")
+          if [ -n "$ZIP_FILES" ]; then
+            for zip_file in $ZIP_FILES; do
+              echo "Contents of $zip_file:"
+              unzip -l "$zip_file" | head -n 20
+              
+              # Check for the source code directory
+              echo "Looking for aermet_source_code_$VERSION in $zip_file:"
+              unzip -l "$zip_file" | grep -i "aermet_source_code" || echo "No aermet_source_code directory found in $zip_file"
+            done
+          else
+            echo "No AERMET ZIP files found in cache"
+          fi
+          
+          # Install AERMET with verbose output
+          echo "Installing AERMET with verbose output:"
+          HOMEBREW_CURL_VERBOSE=1 brew install -v liamswan/brew-aermod/aermet
+          
+          # Check what happened after installation
+          echo "AERMET installation directories:"
+          ls -la $(brew --cellar)/aermet
+          
+          # Check what's in the installed formula directory
+          CELLAR_PATH=$(brew --cellar)/aermet/*
+          echo "Contents of AERMET cellar directory:"
+          find $CELLAR_PATH -type f | grep -v "\.o$" | sort
+          
+          # Look for source code directories
+          echo "Looking for source code directory in Cellar:"
+          find $CELLAR_PATH -type d -name "*source*" -o -name "*aermet*" | sort
+          
+          # Try to run test with verbose output
+          echo "Running brew test with verbose output:"
+          brew test -v liamswan/brew-aermod/aermet || {
+            echo "Test failed. Checking environment:"
+            echo "Current directory: $(pwd)"
+            ls -la
+            echo "AERMET formula content:"
+            cat $(brew formula liamswan/brew-aermod/aermet)
+          }
       
       # Test AERMAP if updated or force_run is true
       - name: Install and test AERMAP
         if: needs.check-for-new-versions.outputs.aermap_update_needed == 'true' || github.event.inputs.force_run == 'true'
         run: |
           echo "Testing AERMAP version: ${{ needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}"
-          brew install --formula liamswan/brew-aermod/aermap
-          brew test liamswan/brew-aermod/aermap
+          
+          # Diagnostic: Check downloaded files
+          echo "Checking ZIP file contents before installation:"
+          VERSION="${{ needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}"
+          brew fetch --force liamswan/brew-aermod/aermap
+          CACHE_PATH=$(brew --cache)
+          echo "Homebrew cache path: $CACHE_PATH"
+          
+          # Look for any AERMAP downloaded files
+          find $CACHE_PATH -name "*aermap*" -o -name "*AERMAP*" | sort
+          
+          # Check contents of any found zip files
+          ZIP_FILES=$(find $CACHE_PATH -name "*aermap*.zip" -o -name "*AERMAP*.zip")
+          if [ -n "$ZIP_FILES" ]; then
+            for zip_file in $ZIP_FILES; do
+              echo "Contents of $zip_file:"
+              unzip -l "$zip_file" | head -n 20
+              
+              # Check for the source code directory
+              echo "Looking for aermap_source_code_$VERSION in $zip_file:"
+              unzip -l "$zip_file" | grep -i "aermap_source_code" || echo "No aermap_source_code directory found in $zip_file"
+            done
+          else
+            echo "No AERMAP ZIP files found in cache"
+          fi
+          
+          # Install AERMAP with verbose output
+          echo "Installing AERMAP with verbose output:"
+          HOMEBREW_CURL_VERBOSE=1 brew install -v liamswan/brew-aermod/aermap
+          
+          # Check what happened after installation
+          echo "AERMAP installation directories:"
+          ls -la $(brew --cellar)/aermap
+          
+          # Check what's in the installed formula directory
+          CELLAR_PATH=$(brew --cellar)/aermap/*
+          echo "Contents of AERMAP cellar directory:"
+          find $CELLAR_PATH -type f | grep -v "\.o$" | sort
+          
+          # Look for source code directories
+          echo "Looking for source code directory in Cellar:"
+          find $CELLAR_PATH -type d -name "*source*" -o -name "*aermap*" | sort
+          
+          # Try to run test with verbose output
+          echo "Running brew test with verbose output:"
+          brew test -v liamswan/brew-aermod/aermap || {
+            echo "Test failed. Checking environment:"
+            echo "Current directory: $(pwd)"
+            ls -la
+            echo "AERMAP formula content:"
+            cat $(brew formula liamswan/brew-aermod/aermap)
+          }
       
       # Create success comment
       - name: Create success notification

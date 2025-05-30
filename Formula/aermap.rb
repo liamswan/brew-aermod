@@ -17,32 +17,47 @@ class Aermap < Formula
   option "with-version", "Specify a version to install (e.g., --with-version=24142)"
 
   def install
-    Dir.chdir("aermap_source_code_#{version}") do # Added Dir.chdir
-      if build.with?("version")
-        version_arg = build.value("version")
-        version_resource = "aermap_#{version_arg}"
-        unless resource_exists?(version_resource)
-          odie("Version #{version_arg} is not available. Please choose a valid version or omit the --with-version option.")
-        end
-        resource(version_resource).stage { buildpath.install(Dir["*"]) }
+    # Stage the specific version resource if requested
+    if build.with?("version")
+      version_arg = build.value("version")
+      version_resource = "aermap_#{version_arg}"
+      unless resource_exists?(version_resource)
+        odie("Version #{version_arg} is not available. Please choose a valid version or omit the --with-version option.")
       end
+      resource(version_resource).stage { buildpath.install(Dir["*"]) }
+    end
 
-      ENV["FC"] = Formula["gcc"].opt_bin/"gfortran"
-      compile_flags = ["-O2"]
-      compile_flags += %w[-fbounds-check -Wuninitialized] if build.with?("bounds-check")
-      link_flags = %w[-O2]
-
-      source_files = Dir["*.f", "*.f90"].sort
-      ENV.deparallelize
-      source_files.each do |src|
-        system("gfortran", "-c", *compile_flags, src)
+    # Extract files from aermap_source_code directory if it exists
+    source_dir = "aermap_source_code_#{version}"
+    if Dir.exist?(source_dir)
+      Dir.chdir(source_dir) do
+        buildpath.install(Dir["*.f", "*.f90"])
       end
+    end
 
-      object_files = source_files.map { |f| File.basename(f, File.extname(f)) + ".o" }
-      system("gfortran", "-o", "aermap", *link_flags, *object_files)
+    # Compiler setup
+    ENV["FC"] = Formula["gcc"].opt_bin/"gfortran"
+    compile_flags = ["-O2"]
+    compile_flags += %w[-fbounds-check -Wuninitialized] if build.with?("bounds-check")
+    link_flags = %w[-O2]
 
-      bin.install("aermap")
-    end # End of Dir.chdir
+    # Compile all source files
+    source_files = Dir["*.f", "*.f90"].sort
+    if source_files.empty?
+      odie "No source files found. Check ZIP structure."
+    end
+    
+    ENV.deparallelize
+    source_files.each do |src|
+      system("gfortran", "-c", *compile_flags, src)
+    end
+
+    # Link everything
+    object_files = source_files.map { |f| File.basename(f, File.extname(f)) + ".o" }
+    system("gfortran", "-o", "aermap", *link_flags, *object_files)
+
+    # Install
+    bin.install("aermap")
   end
 
   test do
