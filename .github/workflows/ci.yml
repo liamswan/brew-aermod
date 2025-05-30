@@ -18,8 +18,16 @@ jobs:
         if: runner.os == 'Linux'
         uses: Homebrew/actions/setup-homebrew@master
 
+      - name: Update Homebrew
+        run: brew update
+
       - name: Brew audit
-        run: brew audit Formula/*.rb
+        run: |
+          for f in Formula/*.rb; do
+            formula_name="$(basename "$f" .rb)"
+            echo "Auditing $formula_name"
+            brew audit "$formula_name" || exit 1
+          done
 
       - name: Install formulas
         run: |
