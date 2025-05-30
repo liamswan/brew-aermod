@@ -1,3 +1,4 @@
+[![Weekly AERMOD Suite Version Check](https://github.com/liamswan/brew-aermod/actions/workflows/weekly-version-check.yml/badge.svg?branch=main)](https://github.com/liamswan/brew-aermod/actions/workflows/weekly-version-check.yml)
 # Homebrew Tap for AERMOD Suite
 
 This repository contains Homebrew formulas for the AERMOD air dispersion modeling system and its preprocessors. It allows macOS and Linux users to easily install the EPA's AERMOD, AERMET, and AERMAP tools using Homebrew.
