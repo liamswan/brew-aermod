@@ -1,6 +1,7 @@
 class Aermod < Formula
   desc "EPA AERMOD air dispersion model (built from source)"
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-preferred-and-recommended-models#aermod"
+  license :public_domain
   version "24142"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/preferred/aermod/aermod_source.zip"
   sha256 "72965f60b8ee5a43a2668ef648afd9057abe3023a8738f9ab37679217fdc5940"
@@ -43,9 +44,8 @@ class Aermod < Formula
   end
 
   test do
-    assert_predicate(bin/"aermod", :executable?)
-    # Test that aermod runs, but ignore the exit status since it will exit non-zero without input
-    system(bin/"aermod", "-h") rescue nil
+    assert_predicate bin/"aermod", :executable?
+    assert_match "AERMOD", shell_output("#{bin}/aermod -h 2>&1", 1)
   end
 
   def resource_exists?(name)

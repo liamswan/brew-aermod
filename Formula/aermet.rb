@@ -1,6 +1,7 @@
 class Aermet < Formula
   desc "EPA AERMET meteorological preprocessor (built from source)"
   homepage "https://www.epa.gov/scram/meteorological-processors-and-accessory-programs#aermet"
+  license :public_domain
   version "24142"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/met/aermet/aermet_source.zip"
   sha256 "0e13af282c990dd08ec535d9476b850b559fe190a48942f2d0e2be705b43fab2"
@@ -43,9 +44,8 @@ class Aermet < Formula
   end
 
   test do
-    assert_predicate(bin/"aermet", :executable?)
-    # Test that aermet runs, but ignore the exit status since it will exit non-zero without input
-    system(bin/"aermet", "-h") rescue nil
+    assert_predicate bin/"aermet", :executable?
+    assert_match "AERMET", shell_output("#{bin}/aermet -h 2>&1", 1)
   end
 
   def resource_exists?(name)
