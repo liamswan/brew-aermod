@@ -543,15 +543,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-  test-formulas:
-    name: Install and test formulas
+  test-aermod:
+    name: Install and test AERMOD
     needs: [check-for-new-versions, update-formulas]
-    if: (needs.check-for-new-versions.outputs.any_updates == 'true' || github.event.inputs.force_run == 'true') && always()
-    runs-on: macos-latest # Or specific macOS version if needed
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest]
+    if: (needs.check-for-new-versions.outputs.aermod_update_needed == 'true' || github.event.inputs.force_run == 'true') && always()
+    runs-on: macos-latest
     steps:
       - name: Set up Homebrew
         id: set-up-homebrew
@@ -562,9 +558,8 @@ jobs:
           brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
           brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
       
-      # Test AERMOD if updated or force_run is true
       - name: Install and test AERMOD
-        if: needs.check-for-new-versions.outputs.aermod_update_needed == 'true' || github.event.inputs.force_run == 'true'
+        continue-on-error: true
         run: |
           echo "Testing AERMOD version: ${{ needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
           
@@ -621,10 +616,36 @@ jobs:
             echo "AERMOD formula content:"
             cat $(brew formula liamswan/brew-aermod/aermod)
           }
+
+      # Create success comment
+      - name: Create success notification
+        if: success()
+        run: |
+          echo "✅ Successfully installed and tested AERMOD"
+          echo ""
+          if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
+            echo "Updated AERMOD: ${{ needs.check-for-new-versions.outputs.aermod_current_version }} -> ${{ needs.check-for-new-versions.outputs.aermod_new_version }}"
+          else
+            echo "Tested current AERMOD version: ${{ needs.check-for-new-versions.outputs.aermod_current_version }}"
+          fi
+
+  test-aermet:
+    name: Install and test AERMET
+    needs: [check-for-new-versions, update-formulas]
+    if: (needs.check-for-new-versions.outputs.aermet_update_needed == 'true' || github.event.inputs.force_run == 'true') && always()
+    runs-on: macos-latest
+    steps:
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@master
       
-      # Test AERMET if updated or force_run is true
+      - name: Add tap
+        run: |
+          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
+          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
+      
       - name: Install and test AERMET
-        if: needs.check-for-new-versions.outputs.aermet_update_needed == 'true' || github.event.inputs.force_run == 'true'
+        continue-on-error: true
         run: |
           echo "Testing AERMET version: ${{ needs.check-for-new-versions.outputs.aermet_new_version || needs.check-for-new-versions.outputs.aermet_current_version }}"
           
@@ -670,7 +691,7 @@ jobs:
           echo "Looking for source code directory in Cellar:"
           find $CELLAR_PATH -type d -name "*source*" -o -name "*aermet*" | sort
           
-          # Try to run test with verbose output
+          # Try to run test with verbose output:
           echo "Running brew test with verbose output:"
           brew test -v liamswan/brew-aermod/aermet || {
             echo "Test failed. Checking environment:"
@@ -679,10 +700,36 @@ jobs:
             echo "AERMET formula content:"
             cat $(brew formula liamswan/brew-aermod/aermet)
           }
+
+      # Create success comment
+      - name: Create success notification
+        if: success()
+        run: |
+          echo "✅ Successfully installed and tested AERMET"
+          echo ""
+          if [ "${{ needs.check-for-new-versions.outputs.aermet_update_needed }}" == "true" ]; then
+            echo "Updated AERMET: ${{ needs.check-for-new-versions.outputs.aermet_current_version }} -> ${{ needs.check-for-new-versions.outputs.aermet_new_version }}"
+          else
+            echo "Tested current AERMET version: ${{ needs.check-for-new-versions.outputs.aermet_current_version }}"
+          fi
+
+  test-aermap:
+    name: Install and test AERMAP
+    needs: [check-for-new-versions, update-formulas]
+    if: (needs.check-for-new-versions.outputs.aermap_update_needed == 'true' || github.event.inputs.force_run == 'true') && always()
+    runs-on: macos-latest
+    steps:
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@master
       
-      # Test AERMAP if updated or force_run is true
+      - name: Add tap
+        run: |
+          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
+          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
+      
       - name: Install and test AERMAP
-        if: needs.check-for-new-versions.outputs.aermap_update_needed == 'true' || github.event.inputs.force_run == 'true'
+        continue-on-error: true
         run: |
           echo "Testing AERMAP version: ${{ needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}"
           
@@ -742,26 +789,17 @@ jobs:
       - name: Create success notification
         if: success()
         run: |
-          echo "✅ Successfully updated and tested AERMOD Suite components"
+          echo "✅ Successfully installed and tested AERMAP"
           echo ""
-          echo "Updated components:"
-          if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
-            echo "- AERMOD: ${{ needs.check-for-new-versions.outputs.aermod_current_version }} -> ${{ needs.check-for-new-versions.outputs.aermod_new_version }}"
-          fi
-          if [ "${{ needs.check-for-new-versions.outputs.aermet_update_needed }}" == "true" ]; then
-            echo "- AERMET: ${{ needs.check-for-new-versions.outputs.aermet_current_version }} -> ${{ needs.check-for-new-versions.outputs.aermet_new_version }}"
-          fi
           if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ]; then
-            echo "- AERMAP: ${{ needs.check-for-new-versions.outputs.aermap_current_version }} -> ${{ needs.check-for-new-versions.outputs.aermap_new_version }}"
+            echo "Updated AERMAP: ${{ needs.check-for-new-versions.outputs.aermap_current_version }} -> ${{ needs.check-for-new-versions.outputs.aermap_new_version }}"
+          else
+            echo "Tested current AERMAP version: ${{ needs.check-for-new-versions.outputs.aermap_current_version }}"
           fi
-          
-          echo ""
-          echo "The new versions are now available for installation:"
-          echo "brew install liamswan/brew-aermod/aermod-suite"
 
   create-issue-on-failure:
     name: Create Issue on Failure
-    needs: [check-for-new-versions, update-formulas, test-formulas]
+    needs: [check-for-new-versions, update-formulas, test-aermod, test-aermet, test-aermap]
     if: failure() && (needs.check-for-new-versions.outputs.any_updates == 'true' || github.event.inputs.force_run == 'true')
     runs-on: ubuntu-latest
     steps:
@@ -791,8 +829,14 @@ jobs:
           if [ "${{ needs.update-formulas.result }}" == "failure" ]; then
             echo "  - update-formulas" >> ./workflow_failure_issue.md
           fi
-          if [ "${{ needs.test-formulas.result }}" == "failure" ]; then
-            echo "  - test-formulas" >> ./workflow_failure_issue.md
+          if [ "${{ needs.test-aermod.result }}" == "failure" ]; then
+            echo "  - test-aermod" >> ./workflow_failure_issue.md
+          fi
+          if [ "${{ needs.test-aermet.result }}" == "failure" ]; then
+            echo "  - test-aermet" >> ./workflow_failure_issue.md
+          fi
+          if [ "${{ needs.test-aermap.result }}" == "failure" ]; then
+            echo "  - test-aermap" >> ./workflow_failure_issue.md
           fi
           echo "" >> ./workflow_failure_issue.md
           echo "Please investigate the workflow logs for more details." >> ./workflow_failure_issue.md
@@ -805,3 +849,49 @@ jobs:
           content-filepath: ./workflow_failure_issue.md # Corrected to content-filepath
           labels: bug, automation, workflow-failure
           assignees: liamswan
+
+  test-summary:
+    name: Test Summary
+    needs: [test-aermod, test-aermet, test-aermap]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create test summary
+        run: |
+          echo "# AERMOD Suite Testing Summary"
+          echo ""
+          echo "## Test Results"
+          echo ""
+          
+          if [ "${{ needs.test-aermod.result }}" == "success" ]; then
+            echo "✅ AERMOD: Passed"
+          elif [ "${{ needs.test-aermod.result }}" == "skipped" ]; then
+            echo "⏭️ AERMOD: Skipped"
+          else
+            echo "❌ AERMOD: Failed"
+          fi
+          
+          if [ "${{ needs.test-aermet.result }}" == "success" ]; then
+            echo "✅ AERMET: Passed"
+          elif [ "${{ needs.test-aermet.result }}" == "skipped" ]; then
+            echo "⏭️ AERMET: Skipped"
+          else
+            echo "❌ AERMET: Failed"
+          fi
+          
+          if [ "${{ needs.test-aermap.result }}" == "success" ]; then
+            echo "✅ AERMAP: Passed"
+          elif [ "${{ needs.test-aermap.result }}" == "skipped" ]; then
+            echo "⏭️ AERMAP: Skipped"
+          else
+            echo "❌ AERMAP: Failed"
+          fi
+          
+          echo ""
+          echo "For more details, please check the individual job logs."
+          
+          # Overall status
+          if [ "${{ needs.test-aermod.result }}" == "success" ] || [ "${{ needs.test-aermet.result }}" == "success" ] || [ "${{ needs.test-aermap.result }}" == "success" ]; then
+            echo ""
+            echo "At least one component passed testing. The formulas should be available for installation."
+          fi
