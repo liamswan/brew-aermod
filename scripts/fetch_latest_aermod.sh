@@ -14,8 +14,8 @@ else
   VERSION=$(curl -fsSL "$SCRAM_PAGE" | grep -oE 'Source Code \(v[0-9]+\) \(ZIP\)' | head -n1 | grep -oE '[0-9]+')
 fi
 
-ARCHIVE="Source Code (v${VERSION}) (ZIP)"
-URL="${BASE_URL}/${ARCHIVE}"
+# Create a properly encoded URL for the source code
+URL="${BASE_URL}/aermod_source.zip"
 
 mkdir -p downloads checksums
 
@@ -23,7 +23,14 @@ out_zip="downloads/aermod_${VERSION}.zip"
 
 curl -L -o "$out_zip" "$URL"
 
-sha256sum "$out_zip" | awk '{print $1 "  aermod_${VERSION}.zip"}' > "checksums/aermod_${VERSION}.sha256"
+# Generate SHA256 checksum
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # macOS
+  shasum -a 256 "$out_zip" | awk '{print $1}' > "checksums/aermod_${VERSION}.sha256"
+else
+  # Linux
+  sha256sum "$out_zip" | awk '{print $1}' > "checksums/aermod_${VERSION}.sha256"
+fi
 
 echo "Downloaded $out_zip and wrote checksum to checksums/aermod_${VERSION}.sha256"
 

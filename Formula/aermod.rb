@@ -1,11 +1,18 @@
 class Aermod < Formula
   desc "EPA AERMOD air dispersion model (built from source)"
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-preferred-and-recommended-models#aermod"
+  version "24142"
+  
+  # Use the official EPA URL but with a stable version
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/preferred/aermod/aermod_source.zip"
-  version "23132"
-  # The EPA frequently updates the source at the same URL, so the checksum can
-  # change. Skip verification so CI doesn't fail when the file is refreshed.
-  sha256 :no_check
+  sha256 "72965f60b8ee5a43a2668ef648afd9057abe3023a8738f9ab37679217fdc5940"
+  
+  # Alternative approach: use a versioned local file
+  # This helps when EPA updates the file at the same URL
+  #resource "aermod_source" do
+  #  url "file://#{HOMEBREW_PREFIX}/Homebrew/Library/Taps/liamswan/homebrew-brew-aermod/downloads/aermod_24142.zip"
+  #  sha256 "72965f60b8ee5a43a2668ef648afd9057abe3023a8738f9ab37679217fdc5940"
+  #end
 
   depends_on "gcc" => :build
 
