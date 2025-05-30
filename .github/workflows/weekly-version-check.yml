@@ -1,4 +1,4 @@
-name: Weekly AERMOD Version Check
+name: Weekly AERMOD Suite Version Check
 
 on:
   schedule:
@@ -7,14 +7,29 @@ on:
   workflow_dispatch:
     # Allow manual triggering for testing
 
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
 jobs:
-  check-for-new-version:
-    name: Check for new AERMOD version
+  check-for-new-versions:
+    name: Check for new versions
     runs-on: ubuntu-latest
     outputs:
-      new_version: ${{ steps.version-check.outputs.new_version }}
-      current_version: ${{ steps.version-check.outputs.current_version }}
-      update_needed: ${{ steps.version-check.outputs.update_needed }}
+      aermod_new_version: ${{ steps.aermod-check.outputs.new_version }}
+      aermod_current_version: ${{ steps.aermod-check.outputs.current_version }}
+      aermod_update_needed: ${{ steps.aermod-check.outputs.update_needed }}
+      
+      aermet_new_version: ${{ steps.aermet-check.outputs.new_version }}
+      aermet_current_version: ${{ steps.aermet-check.outputs.current_version }}
+      aermet_update_needed: ${{ steps.aermet-check.outputs.update_needed }}
+      
+      aermap_new_version: ${{ steps.aermap-check.outputs.new_version }}
+      aermap_current_version: ${{ steps.aermap-check.outputs.current_version }}
+      aermap_update_needed: ${{ steps.aermap-check.outputs.update_needed }}
+      
+      any_updates: ${{ steps.check-any-updates.outputs.any_updates }}
     
     steps:
       - name: Checkout repository
@@ -22,55 +37,184 @@ jobs:
         with:
           fetch-depth: 0
       
-      - name: Check current and latest versions
-        id: version-check
+      - name: Check AERMOD versions
+        id: aermod-check
         run: |
           # Get current version from formula
           CURRENT_VERSION=$(grep -o 'version "[0-9]*"' Formula/aermod.rb | grep -o '[0-9]*')
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           
           # Get latest version from EPA website
-          LATEST_VERSION=$(bash scripts/fetch_latest_aermod.sh --version-only)
-          echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          LATEST_VERSION=$(bash scripts/fetch_latest_aermod.sh --version-only || echo "")
           
-          # Compare versions
-          if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
-            echo "update_needed=true" >> $GITHUB_OUTPUT
-            echo "New version detected: $LATEST_VERSION (current: $CURRENT_VERSION)"
-          else
+          # If version retrieval failed, use the current version to avoid failures
+          if [ -z "$LATEST_VERSION" ]; then
+            echo "::warning::Failed to retrieve latest AERMOD version, using current version instead"
+            LATEST_VERSION=$CURRENT_VERSION
+            echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
             echo "update_needed=false" >> $GITHUB_OUTPUT
-            echo "No new version available. Current version: $CURRENT_VERSION"
+            echo "No new AERMOD version check performed due to EPA website issues. Current version: $CURRENT_VERSION"
+          else
+            echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+            
+            # Compare versions
+            if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+              echo "update_needed=true" >> $GITHUB_OUTPUT
+              echo "New AERMOD version detected: $LATEST_VERSION (current: $CURRENT_VERSION)"
+            else
+              echo "update_needed=false" >> $GITHUB_OUTPUT
+              echo "No new AERMOD version available. Current version: $CURRENT_VERSION"
+            fi
+          fi
+      
+      - name: Check AERMET versions
+        id: aermet-check
+        run: |
+          # Get current version from formula
+          CURRENT_VERSION=$(grep -o 'version "[0-9]*"' Formula/aermet.rb | grep -o '[0-9]*')
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          
+          # Get latest version from EPA website
+          LATEST_VERSION=$(bash scripts/fetch_latest_aermet.sh --version-only || echo "")
+          
+          # If version retrieval failed, use the current version to avoid failures
+          if [ -z "$LATEST_VERSION" ]; then
+            echo "::warning::Failed to retrieve latest AERMET version, using current version instead"
+            LATEST_VERSION=$CURRENT_VERSION
+            echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+            echo "No new AERMET version check performed due to EPA website issues. Current version: $CURRENT_VERSION"
+          else
+            echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+            
+            # Compare versions
+            if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+              echo "update_needed=true" >> $GITHUB_OUTPUT
+              echo "New AERMET version detected: $LATEST_VERSION (current: $CURRENT_VERSION)"
+            else
+              echo "update_needed=false" >> $GITHUB_OUTPUT
+              echo "No new AERMET version available. Current version: $CURRENT_VERSION"
+            fi
+          fi
+      
+      - name: Check AERMAP versions
+        id: aermap-check
+        run: |
+          # Get current version from formula
+          CURRENT_VERSION=$(grep -o 'version "[0-9]*"' Formula/aermap.rb | grep -o '[0-9]*')
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          
+          # Get latest version from EPA website
+          LATEST_VERSION=$(bash scripts/fetch_latest_aermap.sh --version-only || echo "")
+          
+          # If version retrieval failed, use the current version to avoid failures
+          if [ -z "$LATEST_VERSION" ]; then
+            echo "::warning::Failed to retrieve latest AERMAP version, using current version instead"
+            LATEST_VERSION=$CURRENT_VERSION
+            echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+            echo "No new AERMAP version check performed due to EPA website issues. Current version: $CURRENT_VERSION"
+          else
+            echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+            
+            # Compare versions
+            if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+              echo "update_needed=true" >> $GITHUB_OUTPUT
+              echo "New AERMAP version detected: $LATEST_VERSION (current: $CURRENT_VERSION)"
+            else
+              echo "update_needed=false" >> $GITHUB_OUTPUT
+              echo "No new AERMAP version available. Current version: $CURRENT_VERSION"
+            fi
+          fi
+      
+      - name: Check if any updates are needed
+        id: check-any-updates
+        run: |
+          if [ "${{ steps.aermod-check.outputs.update_needed }}" == "true" ] || 
+             [ "${{ steps.aermet-check.outputs.update_needed }}" == "true" ] || 
+             [ "${{ steps.aermap-check.outputs.update_needed }}" == "true" ]; then
+            echo "any_updates=true" >> $GITHUB_OUTPUT
+            echo "Updates are needed for at least one component"
+          else
+            echo "any_updates=false" >> $GITHUB_OUTPUT
+            echo "No updates needed for any component"
           fi
 
-  update-formula:
-    name: Update formula with new version
-    needs: check-for-new-version
-    if: needs.check-for-new-version.outputs.update_needed == 'true'
+  update-formulas:
+    name: Update formulas with new versions
+    needs: check-for-new-versions
+    if: needs.check-for-new-versions.outputs.any_updates == 'true'
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
       
-      - name: Download new version
+      # Download and update AERMOD if needed
+      - name: Download new AERMOD version
+        if: needs.check-for-new-versions.outputs.aermod_update_needed == 'true'
+        id: download-aermod
         run: |
-          echo "Downloading AERMOD version ${{ needs.check-for-new-version.outputs.new_version }}..."
-          bash scripts/fetch_latest_aermod.sh
+          # Create downloads and checksums directories if they don't exist
+          mkdir -p downloads checksums
+          
+          echo "Downloading AERMOD version ${{ needs.check-for-new-versions.outputs.aermod_new_version }}..."
+          if bash scripts/fetch_latest_aermod.sh "${{ needs.check-for-new-versions.outputs.aermod_new_version }}"; then
+            # Validate the downloaded file
+            if [ -f "downloads/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip" ]; then
+              file_size=$(stat -f%z "downloads/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip" || echo "0")
+              if [ "$file_size" -gt "1000" ]; then
+                echo "download_success=true" >> $GITHUB_OUTPUT
+                echo "Downloaded AERMOD successfully ($(($file_size/1024))KB)"
+              else
+                echo "::error::Downloaded AERMOD file is too small (${file_size} bytes)"
+                echo "download_success=false" >> $GITHUB_OUTPUT
+              fi
+            else
+              echo "::error::AERMOD download file not found"
+              echo "download_success=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "::warning::Failed to download AERMOD ${{ needs.check-for-new-versions.outputs.aermod_new_version }}"
+            echo "download_success=false" >> $GITHUB_OUTPUT
+          fi
       
-      - name: Extract checksum
-        id: extract-checksum
+      - name: Extract AERMOD checksum
+        if: needs.check-for-new-versions.outputs.aermod_update_needed == 'true' && steps.download-aermod.outputs.download_success == 'true'
+        id: extract-aermod-checksum
         run: |
-          CHECKSUM=$(cat checksums/aermod_${{ needs.check-for-new-version.outputs.new_version }}.sha256)
-          echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
+          if [ -f "checksums/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.sha256" ]; then
+            CHECKSUM=$(cat checksums/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.sha256)
+            echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
+            echo "checksum_success=true" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Checksum file not found for AERMOD ${{ needs.check-for-new-versions.outputs.aermod_new_version }}"
+            echo "checksum_success=false" >> $GITHUB_OUTPUT
+          fi
       
-      - name: Update formula file
+      - name: Update AERMOD formula
+        if: needs.check-for-new-versions.outputs.aermod_update_needed == 'true' && steps.download-aermod.outputs.download_success == 'true' && steps.extract-aermod-checksum.outputs.checksum_success == 'true'
         run: |
-          NEW_VERSION="${{ needs.check-for-new-version.outputs.new_version }}"
-          CHECKSUM="${{ steps.extract-checksum.outputs.checksum }}"
+          NEW_VERSION="${{ needs.check-for-new-versions.outputs.aermod_new_version }}"
+          CHECKSUM="${{ steps.extract-aermod-checksum.outputs.checksum }}"
+          TAG_DATE=$(date +%Y%m%d)
           
           # Update version and checksum in aermod.rb
           sed -i "s/version \"[0-9]*\"/version \"$NEW_VERSION\"/" Formula/aermod.rb
+          sed -i "s|url \"https://gaftp.epa.gov/Air/aqmg/SCRAM/models/preferred/aermod/aermod_source.zip\"|url \"https://gaftp.epa.gov/Air/aqmg/SCRAM/models/preferred/aermod/aermod_source.zip\"|" Formula/aermod.rb
           sed -i "s/sha256 \"[a-f0-9]*\"/sha256 \"$CHECKSUM\"/" Formula/aermod.rb
+          sed -i "s/sha256 :no_check/sha256 \"$CHECKSUM\"/" Formula/aermod.rb
+          
+          # Add or update resource for this version
+          if grep -q "resource \"aermod_$NEW_VERSION\"" Formula/aermod.rb; then
+            # Update existing resource
+            sed -i "/resource \"aermod_$NEW_VERSION\"/,/end/ s|url \".*\"|url \"https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermod_$NEW_VERSION.zip\"|" Formula/aermod.rb
+            sed -i "/resource \"aermod_$NEW_VERSION\"/,/end/ s/sha256 \"[a-f0-9]*\"/sha256 \"$CHECKSUM\"/" Formula/aermod.rb
+          else
+            # Add new resource
+            RESOURCE_BLOCK="  resource \"aermod_$NEW_VERSION\" do\n    url \"https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermod_$NEW_VERSION.zip\"\n    sha256 \"$CHECKSUM\"\n  end\n"
+            sed -i "/# Versioned resources for specific versions/a\\$RESOURCE_BLOCK" Formula/aermod.rb
+          fi
           
           # Create versioned formula if it doesn't exist
           if [ ! -f "Formula/aermod@$NEW_VERSION.rb" ]; then
@@ -78,56 +222,277 @@ jobs:
             sed -i "s/class Aermod < Formula/class AermodAT$NEW_VERSION < Formula/" "Formula/aermod@$NEW_VERSION.rb"
           fi
       
+      # Download and update AERMET if needed
+      - name: Download new AERMET version
+        if: needs.check-for-new-versions.outputs.aermet_update_needed == 'true'
+        id: download-aermet
+        run: |
+          echo "Downloading AERMET version ${{ needs.check-for-new-versions.outputs.aermet_new_version }}..."
+          if bash scripts/fetch_latest_aermet.sh "${{ needs.check-for-new-versions.outputs.aermet_new_version }}"; then
+            echo "download_success=true" >> $GITHUB_OUTPUT
+          else
+            echo "::warning::Failed to download AERMET ${{ needs.check-for-new-versions.outputs.aermet_new_version }}"
+            echo "download_success=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Extract AERMET checksum
+        if: needs.check-for-new-versions.outputs.aermet_update_needed == 'true' && steps.download-aermet.outputs.download_success == 'true'
+        id: extract-aermet-checksum
+        run: |
+          if [ -f "checksums/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.sha256" ]; then
+            CHECKSUM=$(cat checksums/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.sha256)
+            echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
+            echo "checksum_success=true" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Checksum file not found for AERMET ${{ needs.check-for-new-versions.outputs.aermet_new_version }}"
+            echo "checksum_success=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Update AERMET formula
+        if: needs.check-for-new-versions.outputs.aermet_update_needed == 'true' && steps.download-aermet.outputs.download_success == 'true' && steps.extract-aermet-checksum.outputs.checksum_success == 'true'
+        run: |
+          NEW_VERSION="${{ needs.check-for-new-versions.outputs.aermet_new_version }}"
+          CHECKSUM="${{ steps.extract-aermet-checksum.outputs.checksum }}"
+          TAG_DATE=$(date +%Y%m%d)
+          
+          # Update version and checksum in aermet.rb
+          sed -i "s/version \"[0-9]*\"/version \"$NEW_VERSION\"/" Formula/aermet.rb
+          sed -i "s|url \"https://gaftp.epa.gov/Air/aqmg/SCRAM/models/met/aermet/aermet_source.zip\"|url \"https://gaftp.epa.gov/Air/aqmg/SCRAM/models/met/aermet/aermet_source.zip\"|" Formula/aermet.rb
+          sed -i "s/sha256 \"[a-f0-9]*\"/sha256 \"$CHECKSUM\"/" Formula/aermet.rb
+          sed -i "s/sha256 :no_check/sha256 \"$CHECKSUM\"/" Formula/aermet.rb
+          
+          # Add or update resource for this version
+          if grep -q "resource \"aermet_$NEW_VERSION\"" Formula/aermet.rb; then
+            # Update existing resource
+            sed -i "/resource \"aermet_$NEW_VERSION\"/,/end/ s|url \".*\"|url \"https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermet_$NEW_VERSION.zip\"|" Formula/aermet.rb
+            sed -i "/resource \"aermet_$NEW_VERSION\"/,/end/ s/sha256 \"[a-f0-9]*\"/sha256 \"$CHECKSUM\"/" Formula/aermet.rb
+          else
+            # Add new resource
+            RESOURCE_BLOCK="  resource \"aermet_$NEW_VERSION\" do\n    url \"https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermet_$NEW_VERSION.zip\"\n    sha256 \"$CHECKSUM\"\n  end\n"
+            sed -i "/# Versioned resources for specific versions/a\\$RESOURCE_BLOCK" Formula/aermet.rb
+          fi
+          
+          # Create versioned formula if it doesn't exist
+          if [ ! -f "Formula/aermet@$NEW_VERSION.rb" ]; then
+            cp Formula/aermet.rb "Formula/aermet@$NEW_VERSION.rb"
+            sed -i "s/class Aermet < Formula/class AermetAT$NEW_VERSION < Formula/" "Formula/aermet@$NEW_VERSION.rb"
+          fi
+      
+      # Download and update AERMAP if needed
+      - name: Download new AERMAP version
+        if: needs.check-for-new-versions.outputs.aermap_update_needed == 'true'
+        id: download-aermap
+        run: |
+          echo "Downloading AERMAP version ${{ needs.check-for-new-versions.outputs.aermap_new_version }}..."
+          if bash scripts/fetch_latest_aermap.sh "${{ needs.check-for-new-versions.outputs.aermap_new_version }}"; then
+            echo "download_success=true" >> $GITHUB_OUTPUT
+          else
+            echo "::warning::Failed to download AERMAP ${{ needs.check-for-new-versions.outputs.aermap_new_version }}"
+            echo "download_success=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Extract AERMAP checksum
+        if: needs.check-for-new-versions.outputs.aermap_update_needed == 'true' && steps.download-aermap.outputs.download_success == 'true'
+        id: extract-aermap-checksum
+        run: |
+          if [ -f "checksums/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.sha256" ]; then
+            CHECKSUM=$(cat checksums/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.sha256)
+            echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
+            echo "checksum_success=true" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Checksum file not found for AERMAP ${{ needs.check-for-new-versions.outputs.aermap_new_version }}"
+            echo "checksum_success=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Update AERMAP formula
+        if: needs.check-for-new-versions.outputs.aermap_update_needed == 'true' && steps.download-aermap.outputs.download_success == 'true' && steps.extract-aermap-checksum.outputs.checksum_success == 'true'
+        run: |
+          NEW_VERSION="${{ needs.check-for-new-versions.outputs.aermap_new_version }}"
+          CHECKSUM="${{ steps.extract-aermap-checksum.outputs.checksum }}"
+          TAG_DATE=$(date +%Y%m%d)
+          
+          # Update version and checksum in aermap.rb
+          sed -i "s/version \"[0-9]*\"/version \"$NEW_VERSION\"/" Formula/aermap.rb
+          sed -i "s|url \"https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_source.zip\"|url \"https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_source.zip\"|" Formula/aermap.rb
+          sed -i "s/sha256 \"[a-f0-9]*\"/sha256 \"$CHECKSUM\"/" Formula/aermap.rb
+          sed -i "s/sha256 :no_check/sha256 \"$CHECKSUM\"/" Formula/aermap.rb
+          
+          # Add or update resource for this version
+          if grep -q "resource \"aermap_$NEW_VERSION\"" Formula/aermap.rb; then
+            # Update existing resource
+            sed -i "/resource \"aermap_$NEW_VERSION\"/,/end/ s|url \".*\"|url \"https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermap_$NEW_VERSION.zip\"|" Formula/aermap.rb
+            sed -i "/resource \"aermap_$NEW_VERSION\"/,/end/ s/sha256 \"[a-f0-9]*\"/sha256 \"$CHECKSUM\"/" Formula/aermap.rb
+          else
+            # Add new resource
+            RESOURCE_BLOCK="  resource \"aermap_$NEW_VERSION\" do\n    url \"https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermap_$NEW_VERSION.zip\"\n    sha256 \"$CHECKSUM\"\n  end\n"
+            sed -i "/# Versioned resources for specific versions/a\\$RESOURCE_BLOCK" Formula/aermap.rb
+          fi
+          
+          # Create versioned formula if it doesn't exist
+          if [ ! -f "Formula/aermap@$NEW_VERSION.rb" ]; then
+            cp Formula/aermap.rb "Formula/aermap@$NEW_VERSION.rb"
+            sed -i "s/class Aermap < Formula/class AermapAT$NEW_VERSION < Formula/" "Formula/aermap@$NEW_VERSION.rb"
+          fi
+      
+      # Update the suite formula
       - name: Update aermod-suite formula
         run: |
-          NEW_VERSION="${{ needs.check-for-new-version.outputs.new_version }}"
           # Update the suite version to the current year
           CURRENT_YEAR=$(date +%Y)
+          TAG_DATE=$(date +%Y%m%d)
+          
+          # Update version in aermod-suite.rb
           sed -i "s/version \"[0-9]*\"/version \"$CURRENT_YEAR\"/" Formula/aermod-suite.rb
+          
+          # Update dependencies if needed
+          if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
+            NEW_VERSION="${{ needs.check-for-new-versions.outputs.aermod_new_version }}"
+            sed -i "s/depends_on \"liamswan\/brew-aermod\/aermod@[0-9]*\"/depends_on \"liamswan\/brew-aermod\/aermod@$NEW_VERSION\"/" Formula/aermod-suite.rb
+          fi
+          
+          if [ "${{ needs.check-for-new-versions.outputs.aermet_update_needed }}" == "true" ]; then
+            NEW_VERSION="${{ needs.check-for-new-versions.outputs.aermet_new_version }}"
+            sed -i "s/depends_on \"liamswan\/brew-aermod\/aermet@[0-9]*\"/depends_on \"liamswan\/brew-aermod\/aermet@$NEW_VERSION\"/" Formula/aermod-suite.rb
+          fi
+          
+          if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ]; then
+            NEW_VERSION="${{ needs.check-for-new-versions.outputs.aermap_new_version }}"
+            sed -i "s/depends_on \"liamswan\/brew-aermod\/aermap@[0-9]*\"/depends_on \"liamswan\/brew-aermod\/aermap@$NEW_VERSION\"/" Formula/aermod-suite.rb
+          fi
       
+      # Commit all changes
       - name: Commit and push changes
         run: |
-          NEW_VERSION="${{ needs.check-for-new-version.outputs.new_version }}"
-          
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          git add downloads/aermod_$NEW_VERSION.zip
-          git add checksums/aermod_$NEW_VERSION.sha256
-          git add Formula/aermod.rb
-          git add Formula/aermod-suite.rb
-          git add Formula/aermod@$NEW_VERSION.rb
+          # Add all changed and new files
+          git add downloads/ checksums/ Formula/
           
-          git commit -m "Update AERMOD to version $NEW_VERSION [automated]"
+          # Create commit message based on what was updated
+          COMMIT_MSG="Update AERMOD Suite components [automated]:"
+          
+          if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
+            COMMIT_MSG="$COMMIT_MSG AERMOD ${{ needs.check-for-new-versions.outputs.aermod_new_version }}"
+          fi
+          
+          if [ "${{ needs.check-for-new-versions.outputs.aermet_update_needed }}" == "true" ]; then
+            COMMIT_MSG="$COMMIT_MSG AERMET ${{ needs.check-for-new-versions.outputs.aermet_new_version }}"
+          fi
+          
+          if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ]; then
+            COMMIT_MSG="$COMMIT_MSG AERMAP ${{ needs.check-for-new-versions.outputs.aermap_new_version }}"
+          fi
+          
+          git commit -m "$COMMIT_MSG"
           git push
       
+      # Prepare release assets
+      - name: Prepare release assets
+        id: prepare-assets
+        run: |
+          # Create directory for assets and changes
+          mkdir -p release_assets
+          touch release_assets/changes.md
+          
+          echo "# Changes in this Release" > release_assets/changes.md
+          echo "" >> release_assets/changes.md
+          
+          # Get current date for release tag
+          TAG_DATE=$(date +%Y%m%d)
+          echo "tag_date=$TAG_DATE" >> $GITHUB_OUTPUT
+          
+          # Process each component
+          components=0
+          
+          if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
+            components=$((components + 1))
+            # Validate and copy AERMOD files
+            if [ -f "downloads/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip" ]; then
+              cp downloads/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip release_assets/
+              cp checksums/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.sha256 release_assets/
+              echo "## AERMOD" >> release_assets/changes.md
+              echo "- Updated to version ${{ needs.check-for-new-versions.outputs.aermod_new_version }}" >> release_assets/changes.md
+              echo "- SHA256: $(cat checksums/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.sha256)" >> release_assets/changes.md
+              echo "" >> release_assets/changes.md
+            else
+              echo "::error::AERMOD files not found for release preparation"
+            fi
+          fi
+          
+          if [ "${{ needs.check-for-new-versions.outputs.aermet_update_needed }}" == "true" ]; then
+            components=$((components + 1))
+            # Validate and copy AERMET files
+            if [ -f "downloads/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip" ]; then
+              cp downloads/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip release_assets/
+              cp checksums/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.sha256 release_assets/
+              echo "## AERMET" >> release_assets/changes.md
+              echo "- Updated to version ${{ needs.check-for-new-versions.outputs.aermet_new_version }}" >> release_assets/changes.md
+              echo "- SHA256: $(cat checksums/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.sha256)" >> release_assets/changes.md
+              echo "" >> release_assets/changes.md
+            else
+              echo "::error::AERMET files not found for release preparation"
+            fi
+          fi
+          
+          if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ]; then
+            components=$((components + 1))
+            # Validate and copy AERMAP files
+            if [ -f "downloads/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip" ]; then
+              cp downloads/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip release_assets/
+              cp checksums/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.sha256 release_assets/
+              echo "## AERMAP" >> release_assets/changes.md
+              echo "- Updated to version ${{ needs.check-for-new-versions.outputs.aermap_new_version }}" >> release_assets/changes.md
+              echo "- SHA256: $(cat checksums/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.sha256)" >> release_assets/changes.md
+              echo "" >> release_assets/changes.md
+            else
+              echo "::error::AERMAP files not found for release preparation"
+            fi
+          fi
+          
+          # Set the status
+          if [ "$components" -gt 0 ]; then
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "Found $components component(s) to update"
+          else
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+            echo "No components to update"
+          fi
+      
+      # Create GitHub release
       - name: Create GitHub Release
+        if: steps.prepare-assets.outputs.has_updates == 'true'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ needs.check-for-new-version.outputs.new_version }}
-          name: AERMOD v${{ needs.check-for-new-version.outputs.new_version }}
-          body: |
-            Automated release of AERMOD version ${{ needs.check-for-new-version.outputs.new_version }}
-            
-            ## Installation
-            
-            ```bash
-            # Install latest version
-            brew install liamswan/brew-aermod/aermod
-            
-            # Or install this specific version
-            brew install liamswan/brew-aermod/aermod@${{ needs.check-for-new-version.outputs.new_version }}
-            ```
+          tag_name: v${{ steps.prepare-assets.outputs.tag_date }}
+          name: AERMOD Suite Update - ${{ steps.prepare-assets.outputs.tag_date }}
+          body_path: release_assets/changes.md
           files: |
-            downloads/aermod_${{ needs.check-for-new-version.outputs.new_version }}.zip
+            release_assets/*.zip
+            release_assets/*.sha256
           draft: false
           prerelease: false
+          fail_on_unmatched_files: true
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Verify Release Assets
+        if: steps.prepare-assets.outputs.has_updates == 'true'
+        run: |
+          # Wait a bit for the release to be processed
+          sleep 5
+          
+          # List the release assets for verification
+          echo "Verifying release assets..."
+          gh release view v${{ steps.prepare-assets.outputs.tag_date }} --json assets -q '.assets[].name'
+        env:
+          GH_TOKEN: ${{ github.token }}
 
-  test-formula:
-    name: Test updated formula
-    needs: [check-for-new-version, update-formula]
+  test-formulas:
+    name: Test updated formulas
+    needs: [check-for-new-versions, update-formulas]
+    if: needs.check-for-new-versions.outputs.any_updates == 'true'
     runs-on: macos-latest
     
     steps:
@@ -138,24 +503,46 @@ jobs:
       - name: Add tap
         run: |
           brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
+          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
       
-      - name: Install formula
+      # Test AERMOD if updated
+      - name: Install and test AERMOD
+        if: needs.check-for-new-versions.outputs.aermod_update_needed == 'true'
         run: |
           brew install --verbose liamswan/brew-aermod/aermod
-      
-      - name: Test formula
-        run: |
           brew test liamswan/brew-aermod/aermod
       
-      - name: Create success comment
+      # Test AERMET if updated
+      - name: Install and test AERMET
+        if: needs.check-for-new-versions.outputs.aermet_update_needed == 'true'
+        run: |
+          brew install --verbose liamswan/brew-aermod/aermet
+          brew test liamswan/brew-aermod/aermet
+      
+      # Test AERMAP if updated
+      - name: Install and test AERMAP
+        if: needs.check-for-new-versions.outputs.aermap_update_needed == 'true'
+        run: |
+          brew install --verbose liamswan/brew-aermod/aermap
+          brew test liamswan/brew-aermod/aermap
+      
+      # Create success comment
+      - name: Create success notification
         if: success()
-        uses: peter-evans/create-or-update-comment@v2
-        with:
-          issue-number: ${{ github.event.issue.number }}
-          body: |
-            ✅ Successfully updated and tested AERMOD to version ${{ needs.check-for-new-version.outputs.new_version }}
-            
-            The new version is now available for installation:
-            ```bash
-            brew install liamswan/brew-aermod/aermod
-            ```
+        run: |
+          echo "✅ Successfully updated and tested AERMOD Suite components"
+          echo ""
+          echo "Updated components:"
+          if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
+            echo "- AERMOD: ${{ needs.check-for-new-versions.outputs.aermod_current_version }} -> ${{ needs.check-for-new-versions.outputs.aermod_new_version }}"
+          fi
+          if [ "${{ needs.check-for-new-versions.outputs.aermet_update_needed }}" == "true" ]; then
+            echo "- AERMET: ${{ needs.check-for-new-versions.outputs.aermet_current_version }} -> ${{ needs.check-for-new-versions.outputs.aermet_new_version }}"
+          fi
+          if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ]; then
+            echo "- AERMAP: ${{ needs.check-for-new-versions.outputs.aermap_current_version }} -> ${{ needs.check-for-new-versions.outputs.aermap_new_version }}"
+          fi
+          
+          echo ""
+          echo "The new versions are now available for installation:"
+          echo "brew install liamswan/brew-aermod/aermod-suite"

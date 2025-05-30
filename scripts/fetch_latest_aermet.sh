@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Fetch the latest AERMOD source code and store its checksum
-# Usage: ./scripts/fetch_latest_aermod.sh [VERSION]
-#        ./scripts/fetch_latest_aermod.sh --version-only
-#        ./scripts/fetch_latest_aermod.sh --manual-version=VERSION --manual-checksum=CHECKSUM
+# Fetch the latest AERMET source code and store its checksum
+# Usage: ./scripts/fetch_latest_aermet.sh [VERSION]
+#        ./scripts/fetch_latest_aermet.sh --version-only
+#        ./scripts/fetch_latest_aermet.sh --manual-version=VERSION --manual-checksum=CHECKSUM
 # If VERSION is not supplied, attempt to scrape the latest release number from the EPA SCRAM page.
 # If --version-only is supplied, only output the latest version number and exit.
 # If --manual-version and --manual-checksum are supplied, use those values instead of downloading.
@@ -21,7 +21,7 @@ extract_version() {
   local version=""
   
   # Try multiple patterns to extract version
-  for pattern in 'Source Code \(v([0-9]+)\) \(ZIP\)' 'AERMOD Source Code.+v([0-9]+)' 'AERMOD.+([0-9]{5})'; do
+  for pattern in 'AERMET Source Code - v([0-9]+)' 'AERMET Source Code.*v([0-9]+)' 'AERMET.*([0-9]{5})'; do
     version=$(echo "$html_content" | grep -oE "$pattern" | head -n1 | grep -oE '[0-9]+')
     if [[ -n "$version" ]]; then
       echo "$version"
@@ -33,8 +33,8 @@ extract_version() {
   return 1
 }
 
-BASE_URL="https://gaftp.epa.gov/Air/aqmg/SCRAM/models/preferred/aermod"
-SCRAM_PAGE="https://www.epa.gov/scram/air-quality-dispersion-modeling-preferred-and-recommended-models#aermod"
+BASE_URL="https://gaftp.epa.gov/Air/aqmg/SCRAM/models/met/aermet"
+SCRAM_PAGE="https://www.epa.gov/scram/meteorological-processors-and-accessory-programs#aermet"
 MANUAL_CHECKSUM=""
 
 # Handle manual version and checksum flags
@@ -55,8 +55,8 @@ if [[ $# -gt 0 && "$1" =~ --manual-version=([0-9]+) ]]; then
   mkdir -p downloads checksums
   
   # Write the manual checksum to a file
-  echo "$MANUAL_CHECKSUM" > "checksums/aermod_${VERSION}.sha256"
-  echo "Wrote manual checksum to checksums/aermod_${VERSION}.sha256"
+  echo "$MANUAL_CHECKSUM" > "checksums/aermet_${VERSION}.sha256"
+  echo "Wrote manual checksum to checksums/aermet_${VERSION}.sha256"
   exit 0
 fi
 
@@ -91,13 +91,13 @@ else
 fi
 
 # Create a properly encoded URL for the source code
-URL="${BASE_URL}/aermod_source.zip"
+URL="${BASE_URL}/aermet_source.zip"
 
 mkdir -p downloads checksums
 
-out_zip="downloads/aermod_${VERSION}.zip"
+out_zip="downloads/aermet_${VERSION}.zip"
 
-echo "Downloading AERMOD version $VERSION from $URL..."
+echo "Downloading AERMET version $VERSION from $URL..."
 
 # Attempt to download with a timeout and retry mechanism
 MAX_RETRIES=3
@@ -131,19 +131,18 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
   if [[ -z "$CHECKSUM" ]]; then
     error_exit "Failed to calculate checksum on macOS"
   fi
-  echo "$CHECKSUM" > "checksums/aermod_${VERSION}.sha256"
+  echo "$CHECKSUM" > "checksums/aermet_${VERSION}.sha256"
 else
   # Linux
   CHECKSUM=$(sha256sum "$out_zip" | awk '{print $1}')
   if [[ -z "$CHECKSUM" ]]; then
     error_exit "Failed to calculate checksum on Linux"
   fi
-  echo "$CHECKSUM" > "checksums/aermod_${VERSION}.sha256"
+  echo "$CHECKSUM" > "checksums/aermet_${VERSION}.sha256"
 fi
 
-echo "Downloaded $out_zip and wrote checksum to checksums/aermod_${VERSION}.sha256"
+echo "Downloaded $out_zip and wrote checksum to checksums/aermet_${VERSION}.sha256"
 echo "Checksum: $CHECKSUM"
 
 echo "Add the new files to git:" >&2
-echo "  git add $out_zip checksums/aermod_${VERSION}.sha256" >&2
-
+echo "  git add $out_zip checksums/aermet_${VERSION}.sha256" >&2
