@@ -25,15 +25,55 @@ jobs:
         run: |
           brew tap liamswan/brew-aermod "$(pwd)"
 
-      - name: Brew audit
+      - name: Brew audit (parallel)
         run: |
-          for f in Formula/*.rb; do
+          # Create a list of formulas
+          formulas=(Formula/*.rb)
+          echo "Found ${#formulas[@]} formulas to audit"
+          
+          # Run audits in parallel with a maximum of 4 concurrent processes
+          pids=()
+          formula_names=()
+          
+          for f in "${formulas[@]}"; do
             formula_name="$(basename "$f" .rb)"
-            echo "Auditing liamswan/brew-aermod/$formula_name"
-            if ! brew audit "liamswan/brew-aermod/$formula_name"; then
-              echo "Error: Audit failed for $formula_name"
+            formula_names+=("$formula_name")
+            echo "Starting audit for liamswan/brew-aermod/$formula_name"
+            brew audit "liamswan/brew-aermod/$formula_name" > "audit_${formula_name}.log" 2>&1 &
+            pids+=($!)
+            
+            # Limit concurrent processes
+            if [ ${#pids[@]} -ge 4 ]; then
+              wait "${pids[0]}"
+              exit_code=$?
+              if [ $exit_code -ne 0 ]; then
+                echo "Error: Audit failed for ${formula_names[0]}"
+                cat "audit_${formula_names[0]}.log"
+                exit 1
+              fi
+              pids=("${pids[@]:1}")
+              formula_names=("${formula_names[@]:1}")
+            fi
+          done
+          
+          # Wait for remaining processes
+          for i in "${!pids[@]}"; do
+            pid=${pids[$i]}
+            name=${formula_names[$i]}
+            wait "$pid"
+            exit_code=$?
+            if [ $exit_code -ne 0 ]; then
+              echo "Error: Audit failed for $name"
+              cat "audit_${name}.log"
               exit 1
             fi
+          done
+          
+          # Display all logs
+          for f in "${formulas[@]}"; do
+            formula_name="$(basename "$f" .rb)"
+            echo "=== Audit log for $formula_name ==="
+            cat "audit_${formula_name}.log" || true
           done
 
       - name: Install formulas
