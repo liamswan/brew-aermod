@@ -77,6 +77,18 @@ brew install aermod --without-bounds-check
 
 ## Version Management
 
+### Available Versions
+
+The following versions are currently available:
+
+- Latest stable version: 24142 (as of May 2025)
+- Versioned installations:
+  - `brew install aermod@24142`
+  - `brew install aermet@24142`
+  - `brew install aermap@24142`
+
+By default, installing without a version specifier will give you the latest version.
+
 ### Updating to the Latest Version
 
 To update to the latest version of the AERMOD suite:
@@ -84,6 +96,16 @@ To update to the latest version of the AERMOD suite:
 ```bash
 brew update
 brew upgrade aermod-suite
+```
+
+### Installing a Specific Version
+
+If you need a specific version for regulatory purposes:
+
+```bash
+brew install aermod@24142
+brew install aermet@24142
+brew install aermap@24142
 ```
 
 ### Pinning a Version
@@ -103,27 +125,6 @@ brew unpin aermod
 brew unpin aermet
 brew unpin aermap
 ```
-
-### Fetching Source Archives with Checksums
-
-For reproducible builds you can download the official AERMOD source and record
-its SHA-256 checksum. The `scripts/fetch_latest_aermod.sh` helper script
-automates this:
-
-```bash
-./scripts/fetch_latest_aermod.sh        # downloads the newest release
-# or specify a version number
-./scripts/fetch_latest_aermod.sh 24142
-
-# Afterwards add the new files to version control
-git add downloads/aermod_*.zip checksums/aermod_*.sha256
-git commit -m "Add AERMOD source and checksum"
-```
-
-When a new version is released update the script by changing the VERSION
-argument or letting it scrape the latest version from EPA's SCRAM website. The
-checksum files kept in `checksums/` allow others to verify they are building
-from the same archive.
 
 ## Technical Details
 

@@ -413,6 +413,22 @@ jobs:
             echo "Changes detected, will commit."
           fi
       
+      - name: Update README with latest versions
+        if: steps.check_commit_changes.outputs.no_changes_to_commit == 'false'
+        run: |
+          # Run the README update script
+          bash scripts/update_readme_versions.sh
+          
+          # Add the updated README to git
+          git add README.md
+          
+          # Check if README was actually modified
+          if git diff-index --quiet HEAD -- README.md; then
+            echo "No changes to README needed"
+          else
+            echo "README updated with new version information"
+          fi
+      
       # Commit all changes
       - name: Commit and push changes
         if: steps.check_commit_changes.outputs.no_changes_to_commit == 'false'
@@ -420,8 +436,8 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # Files are already added in the check_commit_changes step
-          # git add downloads/ checksums/ Formula/
+          # Files are already added in the check_commit_changes step and README update step
+          # git add downloads/ checksums/ Formula/ README.md
           
           # Create commit message based on what was updated
           COMMIT_MSG="Update AERMOD Suite components [automated]:"
@@ -437,6 +453,9 @@ jobs:
           if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ]; then
             COMMIT_MSG="$COMMIT_MSG AERMAP ${{ needs.check-for-new-versions.outputs.aermap_new_version }}"
           fi
+          
+          # Add note about README update
+          COMMIT_MSG="$COMMIT_MSG (README updated)"
           
           git commit -m "$COMMIT_MSG"
           git push
@@ -455,6 +474,9 @@ jobs:
           # Get current date for release tag
           TAG_DATE=$(date +%Y%m%d)
           echo "tag_date=$TAG_DATE" >> $GITHUB_OUTPUT
+          
+          # Copy the updated README for release assets
+          cp README.md release_assets/README.md
           
           # Process each component
           components=0
@@ -508,6 +530,28 @@ jobs:
           if [ "$components" -gt 0 ]; then
             echo "has_updates=true" >> $GITHUB_OUTPUT
             echo "Found $components component(s) to update"
+            
+            # Add information about README update
+            echo "## Documentation" >> release_assets/changes.md
+            echo "- Updated README.md with latest version information" >> release_assets/changes.md
+            echo "- Current versions:" >> release_assets/changes.md
+            if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
+              echo "  - AERMOD: ${{ needs.check-for-new-versions.outputs.aermod_new_version }}" >> release_assets/changes.md
+            else
+              echo "  - AERMOD: ${{ needs.check-for-new-versions.outputs.aermod_current_version }}" >> release_assets/changes.md
+            fi
+            
+            if [ "${{ needs.check-for-new-versions.outputs.aermet_update_needed }}" == "true" ]; then
+              echo "  - AERMET: ${{ needs.check-for-new-versions.outputs.aermet_new_version }}" >> release_assets/changes.md
+            else
+              echo "  - AERMET: ${{ needs.check-for-new-versions.outputs.aermet_current_version }}" >> release_assets/changes.md
+            fi
+            
+            if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ]; then
+              echo "  - AERMAP: ${{ needs.check-for-new-versions.outputs.aermap_new_version }}" >> release_assets/changes.md
+            else
+              echo "  - AERMAP: ${{ needs.check-for-new-versions.outputs.aermap_current_version }}" >> release_assets/changes.md
+            fi
           else
             echo "has_updates=false" >> $GITHUB_OUTPUT
             echo "No components to update"
@@ -524,6 +568,7 @@ jobs:
           files: |
             release_assets/*.zip
             release_assets/*.sha256
+            release_assets/README.md
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
