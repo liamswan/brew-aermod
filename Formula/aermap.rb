@@ -1,23 +1,15 @@
 class Aermap < Formula
   desc "EPA AERMAP terrain processor (built from source)"
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-related-model-support-programs#aermap"
-  version "24142"
-  
-  # Main URL for the latest version
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_source.zip"
   sha256 "4b34b39fe0039db114e3e78e3b6faa4797a5f8ee8ca0771db030a9b93ab3bed6"
-  
+  version "24142"
+
   # Versioned resources for specific versions
   resource "aermap_24142" do
     url "https://github.com/liamswan/brew-aermod/releases/download/v20250530/aermap_24142.zip"
     sha256 "4b34b39fe0039db114e3e78e3b6faa4797a5f8ee8ca0771db030a9b93ab3bed6"
   end
-  
-  # Add older versions as needed
-  # resource "aermap_18081" do
-  #   url "https://github.com/liamswan/brew-aermod/releases/download/v20250530/aermap_18081.zip"
-  #   sha256 "add_checksum_here"
-  # end
 
   depends_on "gcc" => :build
 
@@ -26,10 +18,10 @@ class Aermap < Formula
 
   def install
     # Allow installation of a specific version if requested
-    if build.with? "version"
+    if build.with?("version")
       version_arg = build.value("version")
       version_resource = "aermap_#{version_arg}"
-      if build.without? "version" || !resource_exists?(version_resource)
+      if build.without?("version") || !resource_exists?(version_resource)
         odie "Version #{version_arg} is not available. Please choose a valid version or omit the --with-version option."
       end
       resource(version_resource).stage { buildpath.install Dir["*"] }
@@ -37,7 +29,7 @@ class Aermap < Formula
 
     ENV["FC"] = Formula["gcc"].opt_bin/"gfortran"
     compile_flags = ["-O2"]
-    compile_flags += %w[-fbounds-check -Wuninitialized] unless build.without? "bounds-check"
+    compile_flags += %w[-fbounds-check -Wuninitialized] if build.with?("bounds-check")
     link_flags = %w[-O2]
 
     source_files = Dir["*.f", "*.f90"].sort
@@ -55,11 +47,13 @@ class Aermap < Formula
   test do
     # Just check if the binary exists and is executable
     assert_predicate bin/"aermap", :executable?
-    
-    # Try running with -h flag (some versions may not support this)
-    system bin/"aermap", "-h" rescue nil
+    begin
+      system bin/"aermap", "-h"
+    rescue
+      nil
+    end
   end
-  
+
   # Helper method to check if a resource exists
   def resource_exists?(name)
     resources.key?(name.to_sym)
