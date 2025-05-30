@@ -101,17 +101,17 @@ class Aermet < Formula
       # Try to determine a sensible compile order
       ohai "No batch file found, determining module dependencies"
       
-      # First, compile module files which often contain basic definitions
-      module_files = Dir["*mod_*.f90", "*mod_*.f", "mod_*.f90", "mod_*.f"]
-      regular_files = Dir["*.f", "*.f90"].sort - module_files
+      # Define the exact order for critical modules
+      critical_modules = %w[mod_file_units.f90 mod_main1.f90 mod_upperair.f90 mod_surface.f90 mod_onsite.f90 mod_pbl.f90 mod_read_input.f90 mod_reports.f90 mod_misc.f90]
       
-      # Specific handling for known file_units and main1 modules
-      file_units_files = module_files.select { |f| f =~ /file_units/i }
-      main_files = module_files.select { |f| f =~ /main1/i }
-      other_modules = module_files - file_units_files - main_files
+      # Filter out modules that don't exist in our directory
+      existing_critical_modules = critical_modules.select { |f| File.exist?(f) }
       
-      # Compile in this order: file_units -> main1 -> other modules -> regular files
-      source_files = file_units_files + main_files + other_modules + regular_files
+      # Get all remaining files that aren't in our critical list
+      other_files = Dir["*.f", "*.f90"].sort - existing_critical_modules
+      
+      # Use the specific order for modules, followed by other files
+      source_files = existing_critical_modules + other_files
       
       ohai "Compile order: #{source_files.join(", ")}"
     end

@@ -41,15 +41,46 @@ class AermetAT24142 < Formula
     compile_flags += %w[-fbounds-check -Wuninitialized] if build.with?("bounds-check")
     link_flags = %w[-O2]
 
-    # Compile all source files
-    source_files = Dir["*.f", "*.f90"].sort
+    # Define the compilation order based on the batch file
+    # This follows the order in gfortran-aermet_allwarn.bat
+    ordered_modules = %w[
+      mod_file_units.f90
+      mod_main1.f90
+      mod_upperair.f90
+      mod_surface.f90
+      mod_onsite.f90
+      mod_pbl.f90
+      mod_read_input.f90
+      mod_reports.f90
+      mod_misc.f90
+    ]
+    
+    # Get all source files
+    all_source_files = Dir["*.f", "*.f90"].sort
+    
+    # Filter to only include files that exist
+    ordered_modules = ordered_modules.select { |f| all_source_files.include?(f) }
+    
+    # Add any remaining files not in our ordered list
+    remaining_files = all_source_files - ordered_modules
+    source_files = ordered_modules + remaining_files
+    
     if source_files.empty?
       odie "No source files found. Check ZIP structure."
     end
     
     ENV.deparallelize
+    
+    # Compile all files in the determined order
     source_files.each do |src|
-      system("gfortran", "-c", *compile_flags, src)
+      system("gfortran", "-c", "-J.", *compile_flags, src)
+      
+      # Check if compilation succeeded
+      unless $?.success?
+        ohai "Failed to compile #{src}"
+        system("ls", "-la", src) if File.exist?(src)
+        odie "Compilation failed for #{src}"
+      end
     end
 
     # Link everything
