@@ -2,7 +2,7 @@ class Aermet < Formula
   desc "EPA AERMET meteorological preprocessor (built from source)"
   homepage "https://www.epa.gov/scram/meteorological-processors-and-accessory-programs#aermet"
   license :public_domain
-  version "24142"
+  version "00000"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/met/aermet/aermet_source.zip"
   sha256 "0e13af282c990dd08ec535d9476b850b559fe190a48942f2d0e2be705b43fab2"
 
