@@ -3,7 +3,9 @@ class Aermod < Formula
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-preferred-and-recommended-models#aermod"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/preferred/aermod/aermod_source.zip"
   version "23132"
-  sha256 "72965f60b8ee5a43a2668ef648afd9057abe3023a8738f9ab37679217fdc5940"
+  # The EPA frequently updates the source at the same URL, so the checksum can
+  # change. Skip verification so CI doesn't fail when the file is refreshed.
+  sha256 :no_check
 
   depends_on "gcc" => :build
 
