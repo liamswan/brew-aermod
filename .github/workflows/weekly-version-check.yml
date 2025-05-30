@@ -5,7 +5,12 @@ on:
     # Run weekly on Monday at 1:00 AM UTC
     - cron: '0 1 * * 1'
   workflow_dispatch:
-    # Allow manual triggering for testing
+    inputs:
+      force_run:
+        description: 'Force run update and test jobs even if no new versions are found'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -143,7 +148,7 @@ jobs:
   update-formulas:
     name: Update formulas with new versions
     needs: check-for-new-versions
-    if: needs.check-for-new-versions.outputs.any_updates == 'true'
+    if: needs.check-for-new-versions.outputs.any_updates == 'true' || github.event.inputs.force_run == true
     runs-on: ubuntu-latest
     
     steps:
@@ -392,14 +397,29 @@ jobs:
             sed -i "s/depends_on \"liamswan\/brew-aermod\/aermap@[0-9]*\"/depends_on \"liamswan\/brew-aermod\/aermap@$NEW_VERSION\"/" Formula/aermod-suite.rb
           fi
       
+      - name: Check for changes to commit
+        id: check_commit_changes
+        run: |
+          # Add all potentially changed files first
+          git add downloads/ checksums/ Formula/
+          git diff-index --quiet HEAD --
+          if [ $? -eq 0 ]; then
+            echo "no_changes_to_commit=true" >> $GITHUB_OUTPUT
+            echo "No changes to commit."
+          else
+            echo "no_changes_to_commit=false" >> $GITHUB_OUTPUT
+            echo "Changes detected, will commit."
+          fi
+      
       # Commit all changes
       - name: Commit and push changes
+        if: steps.check_commit_changes.outputs.no_changes_to_commit == 'false'
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # Add all changed and new files
-          git add downloads/ checksums/ Formula/
+          # Files are already added in the check_commit_changes step
+          # git add downloads/ checksums/ Formula/
           
           # Create commit message based on what was updated
           COMMIT_MSG="Update AERMOD Suite components [automated]:"
@@ -524,7 +544,7 @@ jobs:
   test-formulas:
     name: Test updated formulas
     needs: [check-for-new-versions, update-formulas]
-    if: needs.check-for-new-versions.outputs.any_updates == 'true'
+    if: (needs.check-for-new-versions.outputs.any_updates == 'true' || github.event.inputs.force_run == true) && always() # ensure it runs if update-formulas ran or was skipped but we forced
     runs-on: macos-latest
     
     steps:
@@ -539,21 +559,21 @@ jobs:
       
       # Test AERMOD if updated
       - name: Install and test AERMOD
-        if: needs.check-for-new-versions.outputs.aermod_update_needed == 'true'
+        if: needs.check-for-new-versions.outputs.aermod_update_needed == 'true' || github.event.inputs.force_run == true
         run: |
           brew install --verbose liamswan/brew-aermod/aermod
           brew test liamswan/brew-aermod/aermod
       
       # Test AERMET if updated
       - name: Install and test AERMET
-        if: needs.check-for-new-versions.outputs.aermet_update_needed == 'true'
+        if: needs.check-for-new-versions.outputs.aermet_update_needed == 'true' || github.event.inputs.force_run == true
         run: |
           brew install --verbose liamswan/brew-aermod/aermet
           brew test liamswan/brew-aermod/aermet
       
       # Test AERMAP if updated
       - name: Install and test AERMAP
-        if: needs.check-for-new-versions.outputs.aermap_update_needed == 'true'
+        if: needs.check-for-new-versions.outputs.aermap_update_needed == 'true' || github.event.inputs.force_run == true
         run: |
           brew install --verbose liamswan/brew-aermod/aermap
           brew test liamswan/brew-aermod/aermap
