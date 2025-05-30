@@ -21,12 +21,19 @@ jobs:
       - name: Update Homebrew
         run: brew update
 
+      - name: Add tap
+        run: |
+          brew tap liamswan/brew-aermod "$(pwd)"
+
       - name: Brew audit
         run: |
           for f in Formula/*.rb; do
             formula_name="$(basename "$f" .rb)"
-            echo "Auditing $formula_name"
-            brew audit "$formula_name" || exit 1
+            echo "Auditing liamswan/brew-aermod/$formula_name"
+            if ! brew audit "liamswan/brew-aermod/$formula_name"; then
+              echo "Error: Audit failed for $formula_name"
+              exit 1
+            fi
           done
 
       - name: Install formulas
