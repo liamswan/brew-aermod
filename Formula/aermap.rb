@@ -3,7 +3,9 @@ class Aermap < Formula
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-related-model-support-programs#aermap"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_source.zip"
   version "18081"
-  sha256 "2222222222222222222222222222222222222222222222222222222222222222" # example only
+  # Source archive may be updated in-place. Skip checksum verification so builds
+  # continue even if the archive changes.
+  sha256 :no_check
 
   depends_on "gcc" => :build
 
