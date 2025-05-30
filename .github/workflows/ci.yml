@@ -34,6 +34,8 @@ jobs:
           # Run audits in parallel with a maximum of 4 concurrent processes
           pids=()
           formula_names=()
+          audit_statuses=()
+          any_failures=0
           
           for f in "${formulas[@]}"; do
             formula_name="$(basename "$f" .rb)"
@@ -49,7 +51,10 @@ jobs:
               if [ $exit_code -ne 0 ]; then
                 echo "Error: Audit failed for ${formula_names[0]}"
                 cat "audit_${formula_names[0]}.log"
-                exit 1
+                audit_statuses+=("${formula_names[0]}: FAILED")
+                any_failures=1
+              else
+                audit_statuses+=("${formula_names[0]}: PASSED")
               fi
               pids=("${pids[@]:1}")
               formula_names=("${formula_names[@]:1}")
@@ -65,33 +70,89 @@ jobs:
             if [ $exit_code -ne 0 ]; then
               echo "Error: Audit failed for $name"
               cat "audit_${name}.log"
-              exit 1
+              audit_statuses+=("$name: FAILED")
+              any_failures=1
+            else
+              audit_statuses+=("$name: PASSED")
             fi
           done
           
-          # Display all logs
+          # Display all logs and create summary
+          echo "========== AUDIT SUMMARY =========="
+          for status in "${audit_statuses[@]}"; do
+            echo "$status"
+          done
+          echo "=================================="
+          
+          echo "========== DETAILED LOGS =========="
           for f in "${formulas[@]}"; do
             formula_name="$(basename "$f" .rb)"
             echo "=== Audit log for $formula_name ==="
             cat "audit_${formula_name}.log" || true
+            echo ""
           done
+          
+          # Fail the workflow if any audit failed
+          if [ $any_failures -ne 0 ]; then
+            echo "One or more audits failed. Check the logs above for details."
+            exit 1
+          fi
 
       - name: Install formulas
         run: |
-          # First install only dependencies
+          # Array to track failures
+          failed_formulas=()
+          
+          echo "Installing dependencies..."
           for f in Formula/*.rb; do
-            brew install --build-from-source --only-dependencies "$f" || exit 1
+            formula_name="$(basename "$f" .rb)"
+            echo "Installing dependencies for $formula_name"
+            if ! brew install --build-from-source --only-dependencies "$f"; then
+              echo "Warning: Failed to install dependencies for $formula_name"
+              failed_formulas+=("$formula_name (dependencies)")
+            fi
           done
-          # Then install the formulas themselves
+          
+          echo "Installing formulas..."
           for f in Formula/*.rb; do
-            echo "Installing $(basename "$f")"
-            brew install --build-from-source "$f" || exit 1
+            formula_name="$(basename "$f" .rb)"
+            echo "Installing $formula_name"
+            if ! brew install --build-from-source "$f"; then
+              echo "Warning: Failed to install $formula_name"
+              failed_formulas+=("$formula_name (installation)")
+            fi
           done
+          
+          # Report failures
+          if [ ${#failed_formulas[@]} -gt 0 ]; then
+            echo "========== INSTALLATION FAILURES =========="
+            for failure in "${failed_formulas[@]}"; do
+              echo "- $failure"
+            done
+            echo "==========================================="
+            exit 1
+          fi
 
       - name: Run tests
         run: |
+          # Array to track test failures
+          failed_tests=()
+          
           for f in Formula/*.rb; do
             formula_name="$(basename "$f" .rb)"
             echo "Testing $formula_name"
-            brew test "$formula_name" || echo "Warning: Test failed for $formula_name but continuing"
+            if ! brew test "$formula_name"; then
+              echo "Warning: Test failed for $formula_name"
+              failed_tests+=("$formula_name")
+            fi
           done
+          
+          # Report test failures
+          if [ ${#failed_tests[@]} -gt 0 ]; then
+            echo "========== TEST FAILURES =========="
+            for failure in "${failed_tests[@]}"; do
+              echo "- $failure"
+            done
+            echo "=================================="
+            exit 1
+          fi
