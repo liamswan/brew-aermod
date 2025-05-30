@@ -25,76 +25,39 @@ jobs:
         run: |
           brew tap liamswan/brew-aermod "$(pwd)"
 
-      - name: Brew audit (parallel)
+      - name: Brew audit
         run: |
           # Create a list of formulas
           formulas=(Formula/*.rb)
           echo "Found ${#formulas[@]} formulas to audit"
           
-          # Run audits in parallel with a maximum of 4 concurrent processes
-          pids=()
-          formula_names=()
-          audit_statuses=()
           any_failures=0
+          failed_formulas=()
           
           for f in "${formulas[@]}"; do
             formula_name="$(basename "$f" .rb)"
-            formula_names+=("$formula_name")
             echo "Starting audit for liamswan/brew-aermod/$formula_name"
-            brew audit "liamswan/brew-aermod/$formula_name" > "audit_${formula_name}.log" 2>&1 &
-            pids+=($!)
             
-            # Limit concurrent processes
-            if [ ${#pids[@]} -ge 4 ]; then
-              wait "${pids[0]}"
-              exit_code=$?
-              if [ $exit_code -ne 0 ]; then
-                echo "Error: Audit failed for ${formula_names[0]}"
-                cat "audit_${formula_names[0]}.log"
-                audit_statuses+=("${formula_names[0]}: FAILED")
-                any_failures=1
-              else
-                audit_statuses+=("${formula_names[0]}: PASSED")
-              fi
-              pids=("${pids[@]:1}")
-              formula_names=("${formula_names[@]:1}")
-            fi
-          done
-          
-          # Wait for remaining processes
-          for i in "${!pids[@]}"; do
-            pid=${pids[$i]}
-            name=${formula_names[$i]}
-            wait "$pid"
-            exit_code=$?
-            if [ $exit_code -ne 0 ]; then
-              echo "Error: Audit failed for $name"
-              cat "audit_${name}.log"
-              audit_statuses+=("$name: FAILED")
+            # Run audit and capture output
+            if ! brew audit --strict "liamswan/brew-aermod/$formula_name" > "audit_${formula_name}.log" 2>&1; then
+              echo "Error: Audit failed for $formula_name"
+              echo "Contents of audit_${formula_name}.log:"
+              cat "audit_${formula_name}.log"
               any_failures=1
+              failed_formulas+=("$formula_name")
             else
-              audit_statuses+=("$name: PASSED")
+              echo "Audit passed for $formula_name"
             fi
           done
           
-          # Display all logs and create summary
-          echo "========== AUDIT SUMMARY =========="
-          for status in "${audit_statuses[@]}"; do
-            echo "$status"
-          done
-          echo "=================================="
-          
-          echo "========== DETAILED LOGS =========="
-          for f in "${formulas[@]}"; do
-            formula_name="$(basename "$f" .rb)"
-            echo "=== Audit log for $formula_name ==="
-            cat "audit_${formula_name}.log" || true
-            echo ""
-          done
-          
-          # Fail the workflow if any audit failed
+          # Summarize all failures at the end
           if [ $any_failures -ne 0 ]; then
-            echo "One or more audits failed. Check the logs above for details."
+            echo "========== AUDIT FAILURES =========="
+            for failure in "${failed_formulas[@]}"; do
+              echo "- $failure"
+            done
+            echo "=================================="
+            echo "One or more audits failed. Please fix the style issues reported above."
             exit 1
           fi
 
