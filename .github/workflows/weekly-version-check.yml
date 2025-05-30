@@ -571,7 +571,7 @@ jobs:
           # Diagnostic: Check downloaded files
           echo "Checking ZIP file contents before installation:"
           VERSION="${{ needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
-          brew tap-new liamswan/brew-aermod
+          # Skip tap-new as the tap is already added in previous steps
           brew fetch --force liamswan/brew-aermod/aermod
           CACHE_PATH=$(brew --cache)
           echo "Homebrew cache path: $CACHE_PATH"
