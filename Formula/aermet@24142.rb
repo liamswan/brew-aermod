@@ -1,4 +1,4 @@
-class Aermet < Formula
+class AermetAT24142 < Formula
   desc "EPA AERMET meteorological preprocessor (built from source)"
   homepage "https://www.epa.gov/scram/meteorological-processors-and-accessory-programs#aermet"
   license :public_domain
