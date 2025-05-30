@@ -40,48 +40,87 @@ class Aermod < Formula
     compile_flags = ["-O2"]
     compile_flags += %w[-fbounds-check -Wuninitialized] if build.with?("bounds-check")
     link_flags = %w[-O2]
-
-    # Check if we need to convert the batch file to shell script
-    bat_file = "#{source_dir}/gfortran-aermod.bat" if Dir.exist?(source_dir)
-    if bat_file && File.exist?(bat_file)
-      # Create a shell script based on the batch file
+    
+    # Prioritize using the batch file if it exists
+    bat_file = "#{source_dir}/gfortran-aermod.bat"
+    
+    if File.exist?(bat_file)
+      ohai "Found gfortran-aermod.bat file, using it as reference for compilation"
+      # Parse the batch file to extract the compile order
       bat_content = File.read(bat_file)
-      sh_content = bat_content.gsub(/\r\n?/, "\n")  # Convert DOS to Unix line endings
-      sh_content.gsub!(/%([^%]+)%/) { "$#{$1.downcase}" }  # Replace %VARS% with $vars
-      sh_content.gsub!(/del /i, "rm -f ")  # Replace DEL with rm -f
       
-      # Add shebang and export statements
-      sh_content = "#!/bin/bash\nexport compile_flags=\"#{compile_flags.join(' ')}\"\nexport link_flags=\"#{link_flags.join(' ')}\"\n\n" + sh_content
+      # Find all compiler commands in the batch file
+      compile_commands = bat_content.scan(/gfortran\s+-c.*\.f/i).map do |cmd|
+        # Extract just the filename from each compile command
+        cmd.match(/\s+([a-zA-Z0-9_]+\.f[90]*)$/i)&.[](1)
+      end.compact
       
-      sh_file = "#{buildpath}/gfortran-aermod.sh"
-      File.write(sh_file, sh_content)
-      FileUtils.chmod(0755, sh_file)
-      
-      system(sh_file)
+      # If we found a compile order, use it
+      if compile_commands.any?
+        ohai "Found #{compile_commands.size} compile commands in batch file"
+        source_files = compile_commands
+      else
+        ohai "Could not parse compile order from batch file, using default ordering"
+        source_files = Dir["*.f", "*.f90"].sort
+      end
     else
-      # Manual compilation if no batch file exists
-      source_files = Dir["*.f", "*.f90"].sort
-      if source_files.empty?
-        odie "No source files found. Check ZIP structure."
-      end
+      # Try to determine a sensible compile order
+      ohai "No batch file found, determining module dependencies"
       
-      ENV.deparallelize
-      source_files.each do |src|
-        system("gfortran", "-c", *compile_flags, src)
-      end
+      # First, compile modules.f which often contains basic definitions
+      module_files = Dir["modules.f", "modules.f90", "*module*.f", "*module*.f90"]
+      regular_files = Dir["*.f", "*.f90"].sort - module_files
       
-      # Link everything
-      object_files = source_files.map { |f| File.basename(f, File.extname(f)) + ".o" }
-      system("gfortran", "-o", "aermod", *link_flags, *object_files)
+      # Specific handling for known main1 module issue
+      main_files = regular_files.select { |f| f =~ /main1/i }
+      other_files = regular_files - main_files
+      
+      # Compile in this order: module files -> main1 files -> other files
+      source_files = module_files + main_files + other_files
+      
+      ohai "Compile order: #{source_files.join(", ")}"
     end
+    
+    # Stop if no source files found
+    if source_files.empty?
+      odie "No source files found. Check ZIP structure."
+    end
+    
+    ENV.deparallelize
+    
+    # Compile all files in the determined order
+    source_files.each do |src|
+      # Skip files that don't exist (in case we extracted names from a batch file)
+      next unless File.exist?(src)
+      
+      # Make sure we can find module files during compilation
+      system("gfortran", "-c", "-J.", *compile_flags, src)
+      
+      # Check if compilation succeeded
+      unless $?.success?
+        ohai "Failed to compile #{src}, checking for the file..."
+        system("ls", "-la", src) if File.exist?(src)
+        odie "Compilation failed for #{src}"
+      end
+    end
+
+    # Link everything
+    object_files = source_files.map { |f| File.basename(f, File.extname(f)) + ".o" }
+                             .select { |o| File.exist?(o) }
+    
+    if object_files.empty?
+      odie "No object files were generated. Compilation failed."
+    end
+    
+    system("gfortran", "-o", "aermod", *link_flags, *object_files)
     
     # Handle the executable
     if File.exist?("aermod.exe")
       mv "aermod.exe", "aermod"
     end
-
-    # Install
-    bin.install("aermod")
+    
+    # Install the final executable
+    bin.install "aermod"
   end
 
   test do
