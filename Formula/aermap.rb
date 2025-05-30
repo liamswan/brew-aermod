@@ -80,8 +80,22 @@ class Aermap < Formula
           
           if link_objects.any?
             ohai "Using object file order from link command: #{link_objects.join(", ")}"
-            # Convert back to source file names for compilation
-            source_files_from_link = link_objects.map { |o| o.sub(/\.o$/, '.f') }
+            # Convert back to source file names for compilation - try both .f and .f90 extensions
+            source_files_from_link = []
+            link_objects.each do |obj|
+              base_name = obj.sub(/\.o$/, '')
+              f_file = "#{base_name}.f"
+              f90_file = "#{base_name}.f90"
+              
+              if File.exist?(f_file)
+                source_files_from_link << f_file
+              elsif File.exist?(f90_file)
+                source_files_from_link << f90_file
+              else
+                ohai "Could not find source file for #{obj}, will try #{f_file} in compilation"
+                source_files_from_link << f_file  # Default to .f extension
+              end
+            end
             
             # Make sure we have all files - add any missing ones from compile_commands
             missing_files = compile_commands - source_files_from_link
@@ -98,20 +112,41 @@ class Aermap < Formula
         source_files = Dir["*.f", "*.f90"].sort
       end
     else
-      # Try to determine a sensible compile order
-      ohai "No batch file found, determining module dependencies"
+      # Define the exact compilation order based on the batch file
+      ohai "No batch file found, using predefined compilation order"
       
-      # First, compile module files which often contain basic definitions
-      module_files = Dir["*mod_*.f", "*mod_*.f90", "mod_*.f", "mod_*.f90"]
-      regular_files = Dir["*.f", "*.f90"].sort - module_files
+      # This is the standard order from gfortran-aermap-64bit.bat
+      ordered_files = %w[
+        mod_main1.f
+        mod_tifftags.f
+        aermap.f
+        sub_calchc.f
+        sub_chkadj.f
+        sub_chkext.f
+        sub_demchk.f
+        sub_nedchk.f
+        sub_cnrcnv.f
+        sub_demrec.f
+        sub_demsrc.f
+        sub_domcnv.f
+        sub_initer_dem.f
+        sub_initer_ned.f
+        sub_nadcon.f
+        sub_reccnv.f
+        sub_recelv.f
+        sub_srccnv.f
+        sub_srcelv.f
+        sub_utmgeo.f
+        sub_read_tifftags.f
+      ]
       
-      # Specific handling for known main1 module and tifftags
-      main_files = module_files.select { |f| f =~ /main1/i }
-      tiff_files = module_files.select { |f| f =~ /tifftags/i }
-      other_modules = module_files - main_files - tiff_files
+      # Filter to only include files that exist
+      all_source_files = Dir["*.f", "*.f90"]
+      existing_ordered_files = ordered_files.select { |f| all_source_files.include?(f) }
       
-      # Compile in this order: main1 -> tifftags -> other modules -> regular files
-      source_files = main_files + tiff_files + other_modules + regular_files
+      # Add any remaining files not in our ordered list
+      remaining_files = all_source_files - existing_ordered_files
+      source_files = existing_ordered_files + remaining_files
       
       ohai "Compile order: #{source_files.join(", ")}"
     end

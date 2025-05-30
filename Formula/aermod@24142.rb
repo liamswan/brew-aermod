@@ -41,15 +41,64 @@ class AermodAT24142 < Formula
     compile_flags += %w[-fbounds-check -Wuninitialized] if build.with?("bounds-check")
     link_flags = %w[-O2]
 
-    # Compile all source files
-    source_files = Dir["*.f", "*.f90"].sort
+    # Define the exact compilation order based on the batch file
+    # This is the standard order from gfortran-aermod.bat
+    ordered_files = %w[
+      modules.f
+      grsm.f
+      aermod.f
+      setup.f
+      coset.f
+      soset.f
+      reset.f
+      meset.f
+      ouset.f
+      inpsum.f
+      metext.f
+      iblval.f
+      siggrid.f
+      tempgrid.f
+      windgrid.f
+      calc1.f
+      calc2.f
+      prise.f
+      arise.f
+      prime.f
+      sigmas.f
+      pitarea.f
+      uninam.f
+      output.f
+      evset.f
+      evcalc.f
+      evoutput.f
+      rline.f
+      bline.f
+    ]
+    
+    # Filter to only include files that exist
+    all_source_files = Dir["*.f", "*.f90"]
+    existing_ordered_files = ordered_files.select { |f| all_source_files.include?(f) }
+    
+    # Add any remaining files not in our ordered list
+    remaining_files = all_source_files - existing_ordered_files
+    source_files = existing_ordered_files + remaining_files
+    
     if source_files.empty?
       odie "No source files found. Check ZIP structure."
     end
     
     ENV.deparallelize
+    
+    # Compile all files in the determined order
     source_files.each do |src|
-      system("gfortran", "-c", *compile_flags, src)
+      system("gfortran", "-c", "-J.", *compile_flags, src)
+      
+      # Check if compilation succeeded
+      unless $?.success?
+        ohai "Failed to compile #{src}"
+        system("ls", "-la", src) if File.exist?(src)
+        odie "Compilation failed for #{src}"
+      end
     end
 
     # Link everything

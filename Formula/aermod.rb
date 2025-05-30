@@ -80,8 +80,22 @@ class Aermod < Formula
           
           if link_objects.any?
             ohai "Using object file order from link command: #{link_objects.join(", ")}"
-            # Convert back to source file names for compilation
-            source_files_from_link = link_objects.map { |o| o.sub(/\.o$/, '.f') }
+            # Convert back to source file names for compilation - try both .f and .f90 extensions
+            source_files_from_link = []
+            link_objects.each do |obj|
+              base_name = obj.sub(/\.o$/, '')
+              f_file = "#{base_name}.f"
+              f90_file = "#{base_name}.f90"
+              
+              if File.exist?(f_file)
+                source_files_from_link << f_file
+              elsif File.exist?(f90_file)
+                source_files_from_link << f90_file
+              else
+                ohai "Could not find source file for #{obj}, will try #{f_file} in compilation"
+                source_files_from_link << f_file  # Default to .f extension
+              end
+            end
             
             # Make sure we have all files - add any missing ones from compile_commands
             missing_files = compile_commands - source_files_from_link
@@ -98,21 +112,49 @@ class Aermod < Formula
         source_files = Dir["*.f", "*.f90"].sort
       end
     else
-      # Try to determine a sensible compile order
-      ohai "No batch file found, determining module dependencies"
+      # Define the exact compilation order based on the batch file
+      ohai "No batch file found, using predefined compilation order"
       
-      # First, compile modules.f which often contains basic definitions
-      module_files = Dir["modules.f", "modules.f90", "*module*.f", "*module*.f90"]
-      regular_files = Dir["*.f", "*.f90"].sort - module_files
+      # This is the standard order from gfortran-aermod.bat
+      ordered_files = %w[
+        modules.f
+        grsm.f
+        aermod.f
+        setup.f
+        coset.f
+        soset.f
+        reset.f
+        meset.f
+        ouset.f
+        inpsum.f
+        metext.f
+        iblval.f
+        siggrid.f
+        tempgrid.f
+        windgrid.f
+        calc1.f
+        calc2.f
+        prise.f
+        arise.f
+        prime.f
+        sigmas.f
+        pitarea.f
+        uninam.f
+        output.f
+        evset.f
+        evcalc.f
+        evoutput.f
+        rline.f
+        bline.f
+      ]
       
-      # Specific handling for known main1 module issue
-      main_files = regular_files.select { |f| f =~ /main1/i }
-      other_files = regular_files - main_files
+      # Filter to only include files that exist
+      all_source_files = Dir["*.f", "*.f90"]
+      existing_ordered_files = ordered_files.select { |f| all_source_files.include?(f) }
       
-      # Compile in this order: modules.f -> other module files -> main1 files -> other files
-      modules_f = module_files.select { |f| f =~ /^modules\.f/i }
-      other_modules = module_files - modules_f
-      source_files = modules_f + other_modules + main_files + other_files
+      # Add any remaining files not in our ordered list
+      remaining_files = all_source_files - existing_ordered_files
+      source_files = existing_ordered_files + remaining_files
       
       ohai "Compile order: #{source_files.join(", ")}"
     end

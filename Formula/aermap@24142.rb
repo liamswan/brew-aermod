@@ -41,15 +41,56 @@ class AermapAT24142 < Formula
     compile_flags += %w[-fbounds-check -Wuninitialized] if build.with?("bounds-check")
     link_flags = %w[-O2]
 
-    # Compile all source files
-    source_files = Dir["*.f", "*.f90"].sort
+    # Define the exact compilation order based on the batch file
+    # This is the standard order from gfortran-aermap-64bit.bat
+    ordered_files = %w[
+      mod_main1.f
+      mod_tifftags.f
+      aermap.f
+      sub_calchc.f
+      sub_chkadj.f
+      sub_chkext.f
+      sub_demchk.f
+      sub_nedchk.f
+      sub_cnrcnv.f
+      sub_demrec.f
+      sub_demsrc.f
+      sub_domcnv.f
+      sub_initer_dem.f
+      sub_initer_ned.f
+      sub_nadcon.f
+      sub_reccnv.f
+      sub_recelv.f
+      sub_srccnv.f
+      sub_srcelv.f
+      sub_utmgeo.f
+      sub_read_tifftags.f
+    ]
+    
+    # Filter to only include files that exist
+    all_source_files = Dir["*.f", "*.f90"]
+    existing_ordered_files = ordered_files.select { |f| all_source_files.include?(f) }
+    
+    # Add any remaining files not in our ordered list
+    remaining_files = all_source_files - existing_ordered_files
+    source_files = existing_ordered_files + remaining_files
+    
     if source_files.empty?
       odie "No source files found. Check ZIP structure."
     end
     
     ENV.deparallelize
+    
+    # Compile all files in the determined order
     source_files.each do |src|
-      system("gfortran", "-c", *compile_flags, src)
+      system("gfortran", "-c", "-J.", *compile_flags, src)
+      
+      # Check if compilation succeeded
+      unless $?.success?
+        ohai "Failed to compile #{src}"
+        system("ls", "-la", src) if File.exist?(src)
+        odie "Compilation failed for #{src}"
+      end
     end
 
     # Link everything
