@@ -17,30 +17,32 @@ class AermetAT24142 < Formula
   option "with-version", "Specify a version to install (e.g., --with-version=24142)"
 
   def install
-    if build.with?("version")
-      version_arg = build.value("version")
-      version_resource = "aermet_#{version_arg}"
-      if !resource_exists?(version_resource)
-        odie("Version #{version_arg} is not available. Please choose a valid version or omit the --with-version option.")
+    Dir.chdir("aermet_source_code_#{version}") do
+      if build.with?("version")
+        version_arg = build.value("version")
+        version_resource = "aermet_#{version_arg}"
+        if !resource_exists?(version_resource)
+          odie("Version #{version_arg} is not available. Please choose a valid version or omit the --with-version option.")
+        end
+        resource(version_resource).stage { buildpath.install(Dir["*"]) }
       end
-      resource(version_resource).stage { buildpath.install(Dir["*"]) }
+
+      ENV["FC"] = Formula["gcc"].opt_bin/"gfortran"
+      compile_flags = ["-O2"]
+      compile_flags += %w[-fbounds-check -Wuninitialized] if build.with?("bounds-check")
+      link_flags = %w[-O2]
+
+      source_files = Dir["*.f", "*.f90"].sort
+      ENV.deparallelize
+      source_files.each do |src|
+        system("gfortran", "-c", *compile_flags, src)
+      end
+
+      object_files = source_files.map { |f| File.basename(f, File.extname(f)) + ".o" }
+      system("gfortran", "-o", "aermet", *link_flags, *object_files)
+
+      bin.install("aermet")
     end
-
-    ENV["FC"] = Formula["gcc"].opt_bin/"gfortran"
-    compile_flags = ["-O2"]
-    compile_flags += %w[-fbounds-check -Wuninitialized] if build.with?("bounds-check")
-    link_flags = %w[-O2]
-
-    source_files = Dir["*.f", "*.f90"].sort
-    ENV.deparallelize
-    source_files.each do |src|
-      system("gfortran", "-c", *compile_flags, src)
-    end
-
-    object_files = source_files.map { |f| File.basename(f, File.extname(f)) + ".o" }
-    system("gfortran", "-o", "aermet", *link_flags, *object_files)
-
-    bin.install("aermet")
   end
 
   test do
