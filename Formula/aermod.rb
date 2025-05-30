@@ -41,20 +41,44 @@ class Aermod < Formula
     compile_flags += %w[-fbounds-check -Wuninitialized] if build.with?("bounds-check")
     link_flags = %w[-O2]
 
-    # Compile all source files
-    source_files = Dir["*.f", "*.f90"].sort
-    if source_files.empty?
-      odie "No source files found. Check ZIP structure."
+    # Check if we need to convert the batch file to shell script
+    bat_file = "#{source_dir}/gfortran-aermod.bat" if Dir.exist?(source_dir)
+    if bat_file && File.exist?(bat_file)
+      # Create a shell script based on the batch file
+      bat_content = File.read(bat_file)
+      sh_content = bat_content.gsub(/\r\n?/, "\n")  # Convert DOS to Unix line endings
+      sh_content.gsub!(/%([^%]+)%/) { "$#{$1.downcase}" }  # Replace %VARS% with $vars
+      sh_content.gsub!(/del /i, "rm -f ")  # Replace DEL with rm -f
+      
+      # Add shebang and export statements
+      sh_content = "#!/bin/bash\nexport compile_flags=\"#{compile_flags.join(' ')}\"\nexport link_flags=\"#{link_flags.join(' ')}\"\n\n" + sh_content
+      
+      sh_file = "#{buildpath}/gfortran-aermod.sh"
+      File.write(sh_file, sh_content)
+      FileUtils.chmod(0755, sh_file)
+      
+      system(sh_file)
+    else
+      # Manual compilation if no batch file exists
+      source_files = Dir["*.f", "*.f90"].sort
+      if source_files.empty?
+        odie "No source files found. Check ZIP structure."
+      end
+      
+      ENV.deparallelize
+      source_files.each do |src|
+        system("gfortran", "-c", *compile_flags, src)
+      end
+      
+      # Link everything
+      object_files = source_files.map { |f| File.basename(f, File.extname(f)) + ".o" }
+      system("gfortran", "-o", "aermod", *link_flags, *object_files)
     end
     
-    ENV.deparallelize
-    source_files.each do |src|
-      system("gfortran", "-c", *compile_flags, src)
+    # Handle the executable
+    if File.exist?("aermod.exe")
+      mv "aermod.exe", "aermod"
     end
-
-    # Link everything
-    object_files = source_files.map { |f| File.basename(f, File.extname(f)) + ".o" }
-    system("gfortran", "-o", "aermod", *link_flags, *object_files)
 
     # Install
     bin.install("aermod")
