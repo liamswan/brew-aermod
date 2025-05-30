@@ -564,7 +564,7 @@ jobs:
       
       # Test AERMOD if updated or force_run is true
       - name: Install and test AERMOD
-        if: needs.check-for-new-versions.outputs.aermod_update_needed == 'true' || github.event.inputs.force_run == true
+        if: needs.check-for-new-versions.outputs.aermod_update_needed == 'true' || github.event.inputs.force_run == 'true'
         run: |
           echo "Testing AERMOD version: ${{ needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
           brew test Formula/aermod.rb
@@ -572,7 +572,7 @@ jobs:
       
       # Test AERMET if updated or force_run is true
       - name: Install and test AERMET
-        if: needs.check-for-new-versions.outputs.aermet_update_needed == 'true' || github.event.inputs.force_run == true
+        if: needs.check-for-new-versions.outputs.aermet_update_needed == 'true' || github.event.inputs.force_run == 'true'
         run: |
           echo "Testing AERMET version: ${{ needs.check-for-new-versions.outputs.aermet_new_version || needs.check-for-new-versions.outputs.aermet_current_version }}"
           brew test Formula/aermet.rb
@@ -580,7 +580,7 @@ jobs:
       
       # Test AERMAP if updated or force_run is true
       - name: Install and test AERMAP
-        if: needs.check-for-new-versions.outputs.aermap_update_needed == 'true' || github.event.inputs.force_run == true
+        if: needs.check-for-new-versions.outputs.aermap_update_needed == 'true' || github.event.inputs.force_run == 'true'
         run: |
           echo "Testing AERMAP version: ${{ needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}"
           brew test Formula/aermap.rb
