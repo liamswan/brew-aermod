@@ -1,6 +1,7 @@
 class Aermap < Formula
   desc "EPA AERMAP terrain processor (built from source)"
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-related-model-support-programs#aermap"
+  license :public_domain
   version "24142"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_source.zip"
   sha256 "4b34b39fe0039db114e3e78e3b6faa4797a5f8ee8ca0771db030a9b93ab3bed6"
@@ -43,9 +44,8 @@ class Aermap < Formula
   end
 
   test do
-    assert_predicate(bin/"aermap", :executable?)
-    # Test that aermap runs, but ignore the exit status since it will exit non-zero without input
-    system(bin/"aermap", "-h") rescue nil
+    assert_predicate bin/"aermap", :executable?
+    assert_match "AERMAP", shell_output("#{bin}/aermap -h 2>&1", 1)
   end
 
   def resource_exists?(name)
