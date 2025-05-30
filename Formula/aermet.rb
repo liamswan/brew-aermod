@@ -3,7 +3,9 @@ class Aermet < Formula
   homepage "https://www.epa.gov/scram/meteorological-processors-and-accessory-programs#aermet"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/met/aermet/aermet_source.zip"
   version "22112"
-  sha256 "1111111111111111111111111111111111111111111111111111111111111111" # example only
+  # EPA sometimes refreshes the archive at the same URL. Disable checksum
+  # validation to avoid failures when the file changes.
+  sha256 :no_check
 
   depends_on "gcc" => :build
 
