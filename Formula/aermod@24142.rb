@@ -1,4 +1,4 @@
-class Aermod < Formula
+class AermodAT24142 < Formula
   desc "EPA AERMOD air dispersion model (built from source)"
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-preferred-and-recommended-models#aermod"
   license :public_domain
