@@ -99,20 +99,8 @@ out_zip="downloads/aermet_${VERSION}.zip"
 
 echo "Downloading AERMET version $VERSION from $URL..."
 
-# Attempt to download with a timeout and retry mechanism
-MAX_RETRIES=3
-for attempt in $(seq 1 $MAX_RETRIES); do
-  echo "Download attempt $attempt of $MAX_RETRIES..."
-  if curl -L --connect-timeout 30 --retry 3 --retry-delay 5 -o "$out_zip" "$URL"; then
-    echo "Download successful!"
-    break
-  elif [[ $attempt -eq $MAX_RETRIES ]]; then
-    error_exit "Failed to download after $MAX_RETRIES attempts. Please check the URL or network connection."
-  else
-    echo "Download failed, retrying in 10 seconds..."
-    sleep 10
-  fi
-done
+# Download the file, allow insecure connections
+curl -k -L --output "$out_zip" "$URL" || error_exit "Failed to download $URL"
 
 # Check if the downloaded file is valid (not empty and not an HTML error page)
 if [[ ! -s "$out_zip" ]]; then
