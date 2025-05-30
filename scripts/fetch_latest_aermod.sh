@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Fetch the latest AERMOD source code and store its checksum
 # Usage: ./scripts/fetch_latest_aermod.sh [VERSION]
-# If VERSION is not supplied, attempt to scrape the latest release number from
-the EPA SCRAM page.
+# If VERSION is not supplied, attempt to scrape the latest release number from the EPA SCRAM page.
 
 set -euo pipefail
 
