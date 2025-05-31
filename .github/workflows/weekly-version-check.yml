@@ -819,6 +819,24 @@ jobs:
           git commit -m "Apply brew style fixes [automated]"
           git push
       
+      - name: Check existence of report files
+        id: check_report_files
+        run: |
+          # Check if report files exist and create empty ones if they don't
+          if [ ! -f formula_audit_report.md ]; then
+            echo "::warning::formula_audit_report.md is missing. Creating an empty file."
+            touch formula_audit_report.md
+            echo "# Formula Audit Report" > formula_audit_report.md
+            echo "No audit data was generated in this run." >> formula_audit_report.md
+          fi
+          
+          if [ ! -f formula_fix_report.md ]; then
+            echo "::warning::formula_fix_report.md is missing. Creating an empty file."
+            touch formula_fix_report.md
+            echo "# Formula Style Fix Report" > formula_fix_report.md
+            echo "No style fix data was generated in this run." >> formula_fix_report.md
+          fi
+      
       - name: Upload audit and style reports
         uses: actions/upload-artifact@v3
         with:
