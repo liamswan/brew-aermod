@@ -8,7 +8,7 @@ class Aermap < Formula
   sha256 "4b34b39fe0039db114e3e78e3b6faa4797a5f8ee8ca0771db030a9b93ab3bed6"
 
   resource "aermap_24142" do
-    url "https://github.com/liamswan/homebrew-aermod/releases/download/v20250530/aermap_24142.zip"
+    url "https://github.com/liamswan/brew-aermod/releases/download/v20250531/aermap_24142.zip"
     sha256 "4b34b39fe0039db114e3e78e3b6faa4797a5f8ee8ca0771db030a9b93ab3bed6"
   end
 
