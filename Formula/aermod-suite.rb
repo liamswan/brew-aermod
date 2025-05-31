@@ -2,13 +2,13 @@ class AermodSuite < Formula
   desc "Meta-formula to install AERMOD and its preprocessors (AERMET, AERMAP)"
   homepage "https://www.epa.gov/scram"
   license :public_domain
-  version "2025"
   url "https://github.com/liamswan/brew-aermod/releases/download/v20250530/aermod-suite-2025.tar.gz"
+  version "2025"
   sha256 "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
-  depends_on "aermod"
   depends_on "aermet"
   depends_on "aermap"
+  depends_on "aermod"
 
   def install
     pkgshare.install "README.md" if File.exist? "README.md"

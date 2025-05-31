@@ -1,7 +1,9 @@
 class AermetAT24142 < Formula
-  desc "EPA AERMET meteorological preprocessor (built from source)"
+  desc "EPA meteorological preprocessor for AERMOD (built from source)"
   homepage "https://www.epa.gov/scram/meteorological-processors-and-accessory-programs#aermet"
   license :public_domain
+  require "English"
+  require "set"
   version "24142"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/met/aermet/aermet_source.zip"
   sha256 "0e13af282c990dd08ec535d9476b850b559fe190a48942f2d0e2be705b43fab2"
@@ -21,9 +23,7 @@ class AermetAT24142 < Formula
     if build.with?("version")
       version_arg = build.value("version")
       version_resource = "aermet_#{version_arg}"
-      if !resource_exists?(version_resource)
-        odie("Version #{version_arg} is not available. Please choose a valid version or omit the --with-version option.")
-      end
+      odie("Version #{version_arg} is not available. Please choose a valid version or omit the --with-version option.") unless resource_exists?(version_resource)
       resource(version_resource).stage { buildpath.install(Dir["*"]) }
     end
 
@@ -54,41 +54,41 @@ class AermetAT24142 < Formula
       mod_reports.f90
       mod_misc.f90
     ]
-    
+
     # Get all source files
     all_source_files = Dir["*.f", "*.f90"].sort
-    
+
     # Filter to only include files that exist
     ordered_modules = ordered_modules.select { |f| all_source_files.include?(f) }
-    
+
     # Add any remaining files not in our ordered list
     remaining_files = all_source_files - ordered_modules
     source_files = ordered_modules + remaining_files
-    
+
     if source_files.empty?
       odie "No source files found. Check ZIP structure."
     end
-    
+
     ENV.deparallelize
-    
+
     # Compile all files in the determined order
     source_files.each do |src|
-      system("gfortran", "-c", "-J.", *compile_flags, src)
-      
+      system "gfortran", "-c", "-J.", *compile_flags, src
+
       # Check if compilation succeeded
-      unless $?.success?
+      unless $CHILD_STATUS.success?
         ohai "Failed to compile #{src}"
-        system("ls", "-la", src) if File.exist?(src)
+        system "ls", "-la", src if File.exist?(src)
         odie "Compilation failed for #{src}"
       end
     end
 
     # Link everything
     object_files = source_files.map { |f| File.basename(f, File.extname(f)) + ".o" }
-    system("gfortran", "-o", "aermet", *link_flags, *object_files)
+    system "gfortran", "-o", "aermet", *link_flags, *object_files
 
     # Install
-    bin.install("aermet")
+    bin.install "aermet"
   end
 
   test do
