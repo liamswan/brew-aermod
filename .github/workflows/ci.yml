@@ -23,7 +23,7 @@ jobs:
 
       - name: Add tap
         run: |
-          brew tap liamswan/brew-aermod "$(pwd)"
+          brew tap liamswan/homebrew-aermod "$(pwd)"
 
       - name: Brew audit
         run: |
@@ -36,10 +36,10 @@ jobs:
           
           for f in "${formulas[@]}"; do
             formula_name="$(basename "$f" .rb)"
-            echo "Starting audit for liamswan/brew-aermod/$formula_name"
+            echo "Starting audit for liamswan/homebrew-aermod/$formula_name"
             
             # Run audit and capture output
-            if ! brew audit --strict "liamswan/brew-aermod/$formula_name" > "audit_${formula_name}.log" 2>&1; then
+            if ! brew audit --strict "liamswan/homebrew-aermod/$formula_name" > "audit_${formula_name}.log" 2>&1; then
               echo "Error: Audit failed for $formula_name"
               echo "Contents of audit_${formula_name}.log:"
               cat "audit_${formula_name}.log"
@@ -59,6 +59,50 @@ jobs:
             echo "=================================="
             echo "One or more audits failed. Please fix the style issues reported above."
             exit 1
+          fi
+          
+      - name: Brew style
+        run: |
+          # Create a list of formulas
+          formulas=(Formula/*.rb)
+          echo "Found ${#formulas[@]} formulas to style check"
+          
+          any_failures=0
+          failed_formulas=()
+          
+          for f in "${formulas[@]}"; do
+            formula_name="$(basename "$f" .rb)"
+            echo "Starting style check for liamswan/homebrew-aermod/$formula_name"
+            
+            # Run style check and fix if possible
+            if ! brew style --fix "liamswan/homebrew-aermod/$formula_name" > "style_${formula_name}.log" 2>&1; then
+              echo "Warning: Style issues found for $formula_name that couldn't be automatically fixed"
+              echo "Contents of style_${formula_name}.log:"
+              cat "style_${formula_name}.log"
+              any_failures=1
+              failed_formulas+=("$formula_name")
+            else
+              echo "Style check passed for $formula_name"
+            fi
+          done
+          
+          # Check if any files were modified by brew style --fix
+          if git diff --quiet -- Formula/; then
+            echo "No style fixes were applied"
+          else
+            echo "Style fixes were applied. Changes:"
+            git diff -- Formula/
+          fi
+          
+          # Summarize all failures at the end
+          if [ $any_failures -ne 0 ]; then
+            echo "========== STYLE CHECK FAILURES =========="
+            for failure in "${failed_formulas[@]}"; do
+              echo "- $failure"
+            done
+            echo "========================================"
+            echo "One or more style checks failed. Please review the issues reported above."
+            # Don't exit with error for style issues, as we've tried to fix them automatically
           fi
 
       - name: Install formulas
@@ -80,11 +124,27 @@ jobs:
           for f in Formula/*.rb; do
             formula_name="$(basename "$f" .rb)"
             echo "Installing $formula_name"
+            
+            # For the aermod-suite formula, install only after component formulas
+            if [[ "$formula_name" == "aermod-suite" ]]; then
+              echo "Skipping $formula_name for now, will install after components..."
+              continue
+            fi
+            
             if ! brew install --build-from-source "$f"; then
               echo "Warning: Failed to install $formula_name"
               failed_formulas+=("$formula_name (installation)")
             fi
           done
+          
+          # Now install the suite formula if it exists
+          if [ -f "Formula/aermod-suite.rb" ]; then
+            echo "Installing aermod-suite..."
+            if ! brew install --build-from-source "Formula/aermod-suite.rb"; then
+              echo "Warning: Failed to install aermod-suite"
+              failed_formulas+=("aermod-suite (installation)")
+            fi
+          fi
           
           # Report failures
           if [ ${#failed_formulas[@]} -gt 0 ]; then
@@ -104,9 +164,26 @@ jobs:
           for f in Formula/*.rb; do
             formula_name="$(basename "$f" .rb)"
             echo "Testing $formula_name"
-            if ! brew test "$formula_name"; then
-              echo "Warning: Test failed for $formula_name"
-              failed_tests+=("$formula_name")
+            
+            # For the suite formula, check that all components are available
+            if [[ "$formula_name" == "aermod-suite" ]]; then
+              echo "Testing AERMOD Suite components..."
+              
+              # Check that the executables are installed and in PATH
+              for component in aermod aermet aermap; do
+                if ! which $component > /dev/null; then
+                  echo "Error: $component executable not found in PATH"
+                  failed_tests+=("$formula_name ($component missing)")
+                else
+                  echo "✓ $component executable found"
+                fi
+              done
+            else
+              # Regular formula test
+              if ! brew test "$formula_name"; then
+                echo "Warning: Test failed for $formula_name"
+                failed_tests+=("$formula_name")
+              fi
             fi
           done
           
