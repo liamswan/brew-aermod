@@ -1,0 +1,74 @@
+name: Clean Previous Releases
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep_latest:
+        description: 'Keep the latest release'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup-releases:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Setup GitHub CLI
+        run: |
+          # GitHub CLI is pre-installed on GitHub-hosted runners
+          gh --version
+      
+      - name: List current releases
+        run: |
+          echo "Current releases:"
+          gh release list
+        env:
+          GH_TOKEN: ${{ github.token }}
+      
+      - name: Delete all releases
+        if: ${{ github.event.inputs.keep_latest == 'false' }}
+        run: |
+          echo "Deleting all releases..."
+          
+          # Get all releases
+          RELEASES=$(gh release list --json tagName --jq '.[].tagName')
+          
+          # Delete each release
+          for tag in $RELEASES; do
+            echo "Deleting release with tag: $tag"
+            gh release delete "$tag" --yes
+          done
+          
+          echo "All releases have been deleted."
+        env:
+          GH_TOKEN: ${{ github.token }}
+      
+      - name: Delete all except latest release
+        if: ${{ github.event.inputs.keep_latest == 'true' }}
+        run: |
+          echo "Deleting all releases except the latest..."
+          
+          # Get all releases sorted by created date (newest first)
+          RELEASES=$(gh release list --json tagName,createdAt --jq 'sort_by(.createdAt) | reverse | .[].tagName')
+          
+          # Extract the first (latest) release
+          LATEST_RELEASE=$(echo "$RELEASES" | head -n 1)
+          OLDER_RELEASES=$(echo "$RELEASES" | tail -n +2)
+          
+          echo "Keeping latest release: $LATEST_RELEASE"
+          
+          # Delete each older release
+          for tag in $OLDER_RELEASES; do
+            echo "Deleting release with tag: $tag"
+            gh release delete "$tag" --yes
+          done
+          
+          echo "All releases except the latest have been deleted."
+        env:
+          GH_TOKEN: ${{ github.token }}
