@@ -225,7 +225,13 @@ style_formula() {
   local formula_file="$1"
   local formula_name="$(basename "${formula_file}" .rb)"
   local output_file="${TEMP_DIR}/${formula_name}_style.txt"
-  
+
+  if [[ "$OFFLINE_MODE" == "true" ]]; then
+    log "info" "Skipping style check for ${formula_name} due to offline mode"
+    echo "Style check skipped in offline mode" > "${output_file}"
+    return 0
+  fi
+
   log "info" "Checking style for formula: ${formula_name}"
   
   # Run style check with --formula flag
@@ -247,7 +253,13 @@ test_formula_install() {
   local formula_file="$1"
   local formula_name="$(basename "${formula_file}" .rb)"
   local output_file="${TEMP_DIR}/${formula_name}_install.txt"
-  
+
+  if [[ "$OFFLINE_MODE" == "true" ]]; then
+    log "info" "Skipping install test for ${formula_name} due to offline mode"
+    echo "Install test skipped in offline mode" > "${output_file}"
+    return 0
+  fi
+
   log "info" "Testing installation of formula: ${formula_name}"
   
   # Test install with --build-from-source --dry-run
@@ -270,7 +282,13 @@ test_formula() {
   local formula_file="$1"
   local formula_name="$(basename "${formula_file}" .rb)"
   local output_file="${TEMP_DIR}/${formula_name}_test.txt"
-  
+
+  if [[ "$OFFLINE_MODE" == "true" ]]; then
+    log "info" "Skipping tests for ${formula_name} due to offline mode"
+    echo "Tests skipped in offline mode" > "${output_file}"
+    return 0
+  fi
+
   log "info" "Running test for formula: ${formula_name}"
   
   # Check if the formula has a test block
