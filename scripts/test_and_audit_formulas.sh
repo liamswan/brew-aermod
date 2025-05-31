@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Test and audit Homebrew formulas locally
 # This script tests and audits all formulas in the Formula directory
+# Can run in both online and offline modes
 
 set -euo pipefail
 
@@ -16,6 +17,37 @@ COLORS_ENABLED=true
 # Set to true to allow formula installation and full testing with:
 # ALLOW_INSTALL=true ./scripts/test_and_audit_formulas.sh
 ALLOW_INSTALL="${ALLOW_INSTALL:-false}"
+
+# Controls whether to run in offline mode (default: auto-detect)
+# Set to true to force offline mode:
+# OFFLINE_MODE=true ./scripts/test_and_audit_formulas.sh
+# Set to false to force online mode:
+# OFFLINE_MODE=false ./scripts/test_and_audit_formulas.sh
+OFFLINE_MODE="${OFFLINE_MODE:-auto}"
+
+# Auto-detect internet connectivity if OFFLINE_MODE is set to auto
+if [[ "$OFFLINE_MODE" == "auto" ]]; then
+  # Try to ping a reliable host to check connectivity
+  if ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1 || ping -c 1 -W 1 1.1.1.1 >/dev/null 2>&1; then
+    OFFLINE_MODE="false"
+    echo "Internet connectivity detected. Running in ONLINE mode."
+  else
+    OFFLINE_MODE="true"
+    echo "No internet connectivity detected. Running in OFFLINE mode."
+  fi
+fi
+
+# Set Homebrew environment variables for offline mode
+if [[ "$OFFLINE_MODE" == "true" ]]; then
+  export HOMEBREW_NO_AUTO_UPDATE=1
+  export HOMEBREW_NO_INSTALL_FROM_API=1
+  export HOMEBREW_NO_INSTALL_CLEANUP=1
+  export HOMEBREW_NO_ANALYTICS=1
+  
+  echo "Running in OFFLINE mode. Network-dependent checks will be limited."
+else
+  echo "Running in ONLINE mode. All checks will be performed."
+fi
 
 # Print paths for debugging
 echo "Script directory: ${SCRIPT_DIR}"
@@ -74,6 +106,11 @@ report_header() {
   echo "# 🧪 Formula Audit Report" > "${REPORT_FILE}"
   echo "<div align=\"right\">" >> "${REPORT_FILE}"
   echo "<strong>Generated on:</strong> $(date)" >> "${REPORT_FILE}"
+  if [[ "$OFFLINE_MODE" == "true" ]]; then
+    echo "<br><strong>Mode:</strong> Offline (limited connectivity checks)" >> "${REPORT_FILE}"
+  else
+    echo "<br><strong>Mode:</strong> Online (full connectivity checks)" >> "${REPORT_FILE}"
+  fi
   echo "</div>" >> "${REPORT_FILE}"
   echo "" >> "${REPORT_FILE}"
   echo "---" >> "${REPORT_FILE}"
@@ -137,26 +174,49 @@ audit_formula() {
   
   log "info" "Auditing formula: ${formula_name}"
   
-  # Run basic audit
-  log "info" "Running basic audit..."
-  brew audit "${formula_name}" > "${output_file}" 2>&1 || true
-  
-  # Run strict audit
-  log "info" "Running strict audit..."
-  brew audit --strict "${formula_name}" >> "${output_file}" 2>&1 || true
-  
-  # Run new formula audit (useful for catching potential issues)
-  log "info" "Running new formula audit..."
-  brew audit --new "${formula_name}" >> "${output_file}" 2>&1 || true
-  
-  # Check if audit found issues
-  if grep -q "Error:" "${output_file}"; then
-    log "error" "Audit found issues for ${formula_name}"
-    cat "${output_file}"
-    return 1
+  if [[ "$OFFLINE_MODE" == "true" ]]; then
+    # Run only local syntax checks in offline mode
+    log "info" "Running local syntax audit only (offline mode)..."
+    
+    # Check Ruby syntax
+    ruby -c "${formula_file}" > "${output_file}" 2>&1 || true
+    
+    # Add offline mode notice
+    echo "" >> "${output_file}"
+    echo "NOTE: Running in offline mode - only basic syntax checks performed." >> "${output_file}"
+    echo "Network-dependent audit checks (URLs, versions, etc.) were skipped." >> "${output_file}"
+    
+    # Consider it a pass if the syntax is valid
+    if grep -q "Syntax OK" "${output_file}"; then
+      log "success" "Basic syntax check passed for ${formula_name}"
+      return 0
+    else
+      log "error" "Syntax check found issues for ${formula_name}"
+      cat "${output_file}"
+      return 1
+    fi
   else
-    log "success" "Audit passed for ${formula_name}"
-    return 0
+    # Run full audit in online mode
+    log "info" "Running basic audit..."
+    brew audit "${formula_name}" > "${output_file}" 2>&1 || true
+    
+    # Run strict audit
+    log "info" "Running strict audit..."
+    brew audit --strict "${formula_name}" >> "${output_file}" 2>&1 || true
+    
+    # Run new formula audit (useful for catching potential issues)
+    log "info" "Running new formula audit..."
+    brew audit --new "${formula_name}" >> "${output_file}" 2>&1 || true
+    
+    # Check if audit found issues
+    if grep -q "Error:" "${output_file}"; then
+      log "error" "Audit found issues for ${formula_name}"
+      cat "${output_file}"
+      return 1
+    else
+      log "success" "Audit passed for ${formula_name}"
+      return 0
+    fi
   fi
 }
 
