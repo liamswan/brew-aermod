@@ -128,6 +128,19 @@ brew unpin aermet
 brew unpin aermap
 ```
 
+## Manual Version Override
+
+If you need to create a release with specific version numbers without the automatic version check detecting new versions, you can use the manual version override feature:
+
+1. Go to the Actions tab in your GitHub repository
+2. Select the "Weekly AERMOD Suite Version Check" workflow
+3. Click "Run workflow"
+4. Check the "Override automatic version check and force specific version numbers" option
+5. Enter the version numbers you want to use for each component
+6. Click "Run workflow"
+
+This will create a release with the specified version numbers, updating the formulas accordingly.
+
 ## Technical Details
 
 These formulas compile the official EPA source code using gfortran (from GCC). The compilation process:
