@@ -43,7 +43,7 @@ class Aermap < Formula
     link_flags = %w[-O2]
 
     # Clean up any existing object files to prevent conflicts
-    rm Dir["*.o", "*.mod"]
+    rm_f Dir["*.o", "*.mod"]
 
     # Check if we have a batch file to use as reference
     bat_file = "#{source_dir}/gfortran-aermap-64bit.bat"
