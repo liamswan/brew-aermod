@@ -1,5 +1,5 @@
 class AermetAT24142 < Formula
-  desc "EPA AERMET meteorological preprocessor (built from source)"
+  desc "EPA meteorological preprocessor for AERMOD (built from source)"
   homepage "https://www.epa.gov/scram/meteorological-processors-and-accessory-programs#aermet"
   license :public_domain
   version "24142"
@@ -73,22 +73,22 @@ class AermetAT24142 < Formula
     
     # Compile all files in the determined order
     source_files.each do |src|
-      system("gfortran", "-c", "-J.", *compile_flags, src)
+      system "gfortran", "-c", "-J.", *compile_flags, src
       
       # Check if compilation succeeded
       unless $?.success?
         ohai "Failed to compile #{src}"
-        system("ls", "-la", src) if File.exist?(src)
+        system "ls", "-la", src if File.exist?(src)
         odie "Compilation failed for #{src}"
       end
     end
 
     # Link everything
     object_files = source_files.map { |f| File.basename(f, File.extname(f)) + ".o" }
-    system("gfortran", "-o", "aermet", *link_flags, *object_files)
+    system "gfortran", "-o", "aermet", *link_flags, *object_files
 
     # Install
-    bin.install("aermet")
+    bin.install "aermet"
   end
 
   test do

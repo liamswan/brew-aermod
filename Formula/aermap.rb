@@ -1,5 +1,5 @@
 class Aermap < Formula
-  desc "EPA AERMAP terrain processor (built from source)"
+  desc "EPA terrain processor for AERMOD (built from source)"
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-related-model-support-programs#aermap"
   license :public_domain
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_source.zip"
@@ -83,7 +83,7 @@ class Aermap < Formula
             # Convert back to source file names for compilation - try both .f and .f90 extensions
             source_files_from_link = []
             link_objects.each do |obj|
-              base_name = obj.sub(/\.o$/, '')
+              base_name = obj.sub(/\.o$/, "")
               f_file = "#{base_name}.f"
               f90_file = "#{base_name}.f90"
               
@@ -93,7 +93,7 @@ class Aermap < Formula
                 source_files_from_link << f90_file
               else
                 ohai "Could not find source file for #{obj}, will try #{f_file} in compilation"
-                source_files_from_link << f_file  # Default to .f extension
+                source_files_from_link << f_file # Default to .f extension
               end
             end
             
@@ -152,9 +152,7 @@ class Aermap < Formula
     end
     
     # Stop if no source files found
-    if source_files.empty?
-      odie "No source files found. Check ZIP structure."
-    end
+    odie "No source files found. Check ZIP structure." if source_files.empty?
     
     ENV.deparallelize
     
@@ -174,12 +172,12 @@ class Aermap < Formula
       
       # Make sure we can find module files during compilation
       ohai "Compiling #{src}"
-      system("gfortran", "-c", "-J.", *compile_flags, src)
+      system "gfortran", "-c", "-J.", *compile_flags, src
       
       # Check if compilation succeeded
       unless $?.success?
         ohai "Failed to compile #{src}, checking for the file..."
-        system("ls", "-la", src) if File.exist?(src)
+        system "ls", "-la", src if File.exist?(src)
         odie "Compilation failed for #{src}"
       end
       
@@ -188,9 +186,7 @@ class Aermap < Formula
       object_files << obj_name if File.exist?(obj_name)
     end
     
-    if object_files.empty?
-      odie "No object files were generated. Compilation failed."
-    end
+    odie "No object files were generated. Compilation failed." if object_files.empty?
     
     # Ensure no duplicate object files in the link step
     unique_object_files = object_files.uniq
@@ -199,10 +195,10 @@ class Aermap < Formula
     ohai "Linking #{unique_object_files.size} object files: #{unique_object_files.join(", ")}"
     
     # Link only unique object files
-    system("gfortran", "-o", "aermap", *link_flags, *unique_object_files)
+    system "gfortran", "-o", "aermap", *link_flags, *unique_object_files
 
     # Install
-    bin.install("aermap")
+    bin.install "aermap"
   end
 
   test do
