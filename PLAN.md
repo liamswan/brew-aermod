@@ -163,7 +163,7 @@ end
 
 **Explanation**: AERMAP's source includes many sub_*.f files for various subroutines and two mod_*.f files. We compile in the order defined by the official script (module files first, then main program and subs). The `-m64` flag used in EPA's scripts is not explicitly added here; Homebrew's gfortran will target the native architecture (64-bit on modern systems). The final executable aermap is installed. Update the version code (18081 here might correspond to a 2018 release – use a more current code if applicable) and SHA256 as needed.
 
-Each of these formulas can be placed in a Homebrew Tap (e.g., your GitHub repo user/homebrew-aermod) or added locally. After writing them, run `brew install ./aermod.rb`, etc., to test locally or `brew tap user/aermod` and then `brew install user/aermod/aermod` if using a tap.
+Each of these formulas can be placed in a Homebrew Tap (e.g., your GitHub repo user/homebrew-aermod) or added locally. After writing them, run `brew install ./aermod.rb`, etc., to test locally or `brew tap user/homebrew-aermod` and then `brew install user/homebrew-aermod/aermod` if using a tap.
 If you are starting from scratch, Homebrew can create the tap repository for you with:
 
 ```bash
