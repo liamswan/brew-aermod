@@ -376,14 +376,28 @@ jobs:
       # Update the suite formula
       - name: Update aermod-suite formula
         run: |
-          # Update the suite version to the current year
-          CURRENT_YEAR=$(date +%Y)
           TAG_DATE=$(date +%Y%m%d)
           
-          # Update version in aermod-suite.rb
-          sed -i "s/version \"[0-9]*\"/version \"$CURRENT_YEAR\"/" Formula/aermod-suite.rb
+          # Get the latest version of each component
+          AERMOD_VERSION="${{ needs.check-for-new-versions.outputs.aermod_update_needed == 'true' && needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
+          AERMET_VERSION="${{ needs.check-for-new-versions.outputs.aermet_update_needed == 'true' && needs.check-for-new-versions.outputs.aermet_new_version || needs.check-for-new-versions.outputs.aermet_current_version }}"
+          AERMAP_VERSION="${{ needs.check-for-new-versions.outputs.aermap_update_needed == 'true' && needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}"
           
-          # Update dependencies if needed
+          # Create a combined version string for the suite
+          # If all components have the same version, use that, otherwise use a dash-separated string
+          if [ "$AERMOD_VERSION" == "$AERMET_VERSION" ] && [ "$AERMET_VERSION" == "$AERMAP_VERSION" ]; then
+            SUITE_VERSION="$AERMOD_VERSION"
+            echo "All components have the same version: $SUITE_VERSION"
+          else
+            SUITE_VERSION="${AERMOD_VERSION}-${AERMET_VERSION}-${AERMAP_VERSION}"
+            echo "Using combined version string: $SUITE_VERSION"
+          fi
+          
+          # Update version in aermod-suite.rb
+          sed -i "s/version \"[0-9]*\"/version \"$SUITE_VERSION\"/" Formula/aermod-suite.rb
+          sed -i "s/version \"[0-9]*-[0-9]*-[0-9]*\"/version \"$SUITE_VERSION\"/" Formula/aermod-suite.rb
+          
+          # Update dependencies to use the latest versions
           if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
             NEW_VERSION="${{ needs.check-for-new-versions.outputs.aermod_new_version }}"
             sed -i "s/depends_on \"liamswan\/brew-aermod\/aermod@[0-9]*\"/depends_on \"liamswan\/brew-aermod\/aermod@$NEW_VERSION\"/" Formula/aermod-suite.rb
@@ -397,6 +411,15 @@ jobs:
           if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ]; then
             NEW_VERSION="${{ needs.check-for-new-versions.outputs.aermap_new_version }}"
             sed -i "s/depends_on \"liamswan\/brew-aermod\/aermap@[0-9]*\"/depends_on \"liamswan\/brew-aermod\/aermap@$NEW_VERSION\"/" Formula/aermod-suite.rb
+          fi
+          
+          # Add a comment to the formula indicating the component versions
+          COMPONENT_VERSIONS="# AERMOD Suite with components: AERMOD $AERMOD_VERSION, AERMET $AERMET_VERSION, AERMAP $AERMAP_VERSION"
+          if grep -q "# AERMOD Suite with components:" Formula/aermod-suite.rb; then
+            sed -i "s/# AERMOD Suite with components:.*/$COMPONENT_VERSIONS/" Formula/aermod-suite.rb
+          else
+            # Insert after the class declaration
+            sed -i "/class AermodSuite < Formula/a\\  $COMPONENT_VERSIONS" Formula/aermod-suite.rb
           fi
       
       - name: Check for changes to commit
@@ -552,6 +575,19 @@ jobs:
             else
               echo "  - AERMAP: ${{ needs.check-for-new-versions.outputs.aermap_current_version }}" >> release_assets/changes.md
             fi
+            
+            # Get the suite version
+            AERMOD_VERSION="${{ needs.check-for-new-versions.outputs.aermod_update_needed == 'true' && needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
+            AERMET_VERSION="${{ needs.check-for-new-versions.outputs.aermet_update_needed == 'true' && needs.check-for-new-versions.outputs.aermet_new_version || needs.check-for-new-versions.outputs.aermet_current_version }}"
+            AERMAP_VERSION="${{ needs.check-for-new-versions.outputs.aermap_update_needed == 'true' && needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}"
+            
+            if [ "$AERMOD_VERSION" == "$AERMET_VERSION" ] && [ "$AERMET_VERSION" == "$AERMAP_VERSION" ]; then
+              SUITE_VERSION="$AERMOD_VERSION"
+            else
+              SUITE_VERSION="${AERMOD_VERSION}-${AERMET_VERSION}-${AERMAP_VERSION}"
+            fi
+            
+            echo "  - AERMOD-Suite: $SUITE_VERSION (combined version)" >> release_assets/changes.md
           else
             echo "has_updates=false" >> $GITHUB_OUTPUT
             echo "No components to update"
@@ -588,9 +624,130 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+  audit-and-style-fix:
+    name: Audit and fix formula style
+    needs: [check-for-new-versions, update-formulas]
+    # Run if formulas were updated or if force_run is true
+    if: always() && (needs.check-for-new-versions.outputs.any_updates == 'true' || github.event.inputs.force_run == 'true')
+    runs-on: macos-latest
+    steps:
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+      
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref }}
+      
+      - name: Run brew audit
+        id: audit
+        run: |
+          echo "Running brew audit on all formulas..."
+          
+          # Create a report file
+          touch formula_audit_report.md
+          echo "# Formula Audit Report" > formula_audit_report.md
+          echo "Generated on $(date)" >> formula_audit_report.md
+          echo "" >> formula_audit_report.md
+          
+          # Audit all formulas
+          FORMULAS=$(find Formula -name "*.rb")
+          ALL_PASS=true
+          
+          for formula in $FORMULAS; do
+            echo "Auditing $formula..."
+            echo "## Auditing $formula" >> formula_audit_report.md
+            echo '```' >> formula_audit_report.md
+            if brew audit --strict "$formula"; then
+              echo "✅ $formula passed audit" >> formula_audit_report.md
+            else
+              echo "⚠️ $formula has audit warnings" >> formula_audit_report.md
+              ALL_PASS=false
+            fi
+            echo '```' >> formula_audit_report.md
+            echo "" >> formula_audit_report.md
+          done
+          
+          if [ "$ALL_PASS" = true ]; then
+            echo "audit_success=true" >> $GITHUB_OUTPUT
+            echo "All formulas passed audit!"
+          else
+            echo "audit_success=false" >> $GITHUB_OUTPUT
+            echo "Some formulas have audit warnings. See report for details."
+          fi
+      
+      - name: Fix formula style
+        id: style_fix
+        run: |
+          echo "Running brew style --fix on all formulas..."
+          
+          # Create a report file
+          touch formula_fix_report.md
+          echo "# Formula Style Fix Report" > formula_fix_report.md
+          echo "Generated on $(date)" >> formula_fix_report.md
+          echo "" >> formula_fix_report.md
+          
+          # Fix style for all formulas
+          FORMULAS=$(find Formula -name "*.rb")
+          ALL_FIXED=true
+          
+          for formula in $FORMULAS; do
+            echo "Fixing style for $formula..."
+            echo "## Fixing style for $formula" >> formula_fix_report.md
+            echo '```' >> formula_fix_report.md
+            if brew style --fix "$formula"; then
+              echo "✅ $formula style fixed or already good" >> formula_fix_report.md
+            else
+              echo "⚠️ $formula has style issues that couldn't be automatically fixed" >> formula_fix_report.md
+              ALL_FIXED=false
+            fi
+            echo '```' >> formula_fix_report.md
+            echo "" >> formula_fix_report.md
+          done
+          
+          if [ "$ALL_FIXED" = true ]; then
+            echo "style_fix_success=true" >> $GITHUB_OUTPUT
+            echo "All formulas have good style or were fixed!"
+          else
+            echo "style_fix_success=false" >> $GITHUB_OUTPUT
+            echo "Some formulas have style issues that couldn't be automatically fixed. See report for details."
+          fi
+      
+      - name: Check for changes to commit
+        id: check_style_changes
+        run: |
+          git add Formula/
+          git diff-index --quiet HEAD --
+          if [ $? -eq 0 ]; then
+            echo "no_style_changes=true" >> $GITHUB_OUTPUT
+            echo "No style changes to commit."
+          else
+            echo "no_style_changes=false" >> $GITHUB_OUTPUT
+            echo "Style changes detected, will commit."
+          fi
+      
+      - name: Commit style changes
+        if: steps.check_style_changes.outputs.no_style_changes == 'false'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          git commit -m "Apply brew style fixes [automated]"
+          git push
+      
+      - name: Upload audit and style reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: formula-reports
+          path: |
+            formula_audit_report.md
+            formula_fix_report.md
+          retention-days: 14
+
   test-aermod:
     name: Install and test AERMOD
-    needs: [check-for-new-versions, update-formulas]
+    needs: [check-for-new-versions, update-formulas, audit-and-style-fix]
     if: (needs.check-for-new-versions.outputs.aermod_update_needed == 'true' || github.event.inputs.force_run == 'true') && always()
     runs-on: macos-latest
     steps:
@@ -676,7 +833,7 @@ jobs:
 
   test-aermet:
     name: Install and test AERMET
-    needs: [check-for-new-versions, update-formulas]
+    needs: [check-for-new-versions, update-formulas, audit-and-style-fix]
     if: (needs.check-for-new-versions.outputs.aermet_update_needed == 'true' || github.event.inputs.force_run == 'true') && always()
     runs-on: macos-latest
     steps:
@@ -760,7 +917,7 @@ jobs:
 
   test-aermap:
     name: Install and test AERMAP
-    needs: [check-for-new-versions, update-formulas]
+    needs: [check-for-new-versions, update-formulas, audit-and-style-fix]
     if: (needs.check-for-new-versions.outputs.aermap_update_needed == 'true' || github.event.inputs.force_run == 'true') && always()
     runs-on: macos-latest
     steps:
@@ -842,9 +999,88 @@ jobs:
             echo "Tested current AERMAP version: ${{ needs.check-for-new-versions.outputs.aermap_current_version }}"
           fi
 
+  test-aermod-suite:
+    name: Install and test AERMOD Suite
+    needs: [check-for-new-versions, update-formulas, audit-and-style-fix]
+    # Always run when force_run is true, or if any component has been updated
+    if: (github.event.inputs.force_run == 'true' || needs.check-for-new-versions.outputs.any_updates == 'true') && always()
+    runs-on: macos-latest
+    steps:
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+      
+      - name: Add tap
+        run: |
+          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
+          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
+      
+      - name: Install and test AERMOD Suite
+        continue-on-error: true
+        run: |
+          echo "Testing AERMOD Suite with components:"
+          echo "- AERMOD: ${{ needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
+          echo "- AERMET: ${{ needs.check-for-new-versions.outputs.aermet_new_version || needs.check-for-new-versions.outputs.aermet_current_version }}"
+          echo "- AERMAP: ${{ needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}"
+          
+          # Fetch the formula first
+          brew fetch --force liamswan/brew-aermod/aermod-suite
+          
+          # Install the suite with verbose output
+          echo "Installing AERMOD Suite with verbose output:"
+          HOMEBREW_CURL_VERBOSE=1 brew install -v liamswan/brew-aermod/aermod-suite
+          
+          # Check what was installed
+          echo "AERMOD Suite installed components:"
+          brew list liamswan/brew-aermod/aermod-suite
+          
+          # Verify that all dependencies were installed
+          echo "Checking AERMOD installation:"
+          brew list liamswan/brew-aermod/aermod || echo "AERMOD not found"
+          
+          echo "Checking AERMET installation:"
+          brew list liamswan/brew-aermod/aermet || echo "AERMET not found"
+          
+          echo "Checking AERMAP installation:"
+          brew list liamswan/brew-aermod/aermap || echo "AERMAP not found"
+          
+          # Test that the executables are available
+          echo "Testing AERMOD executable:"
+          which aermod || echo "AERMOD executable not found"
+          
+          echo "Testing AERMET executable:"
+          which aermet || echo "AERMET executable not found"
+          
+          echo "Testing AERMAP executable:"
+          which aermap || echo "AERMAP executable not found"
+      
+      # Create success comment
+      - name: Create success notification
+        if: success()
+        run: |
+          echo "✅ Successfully installed and tested AERMOD Suite"
+          echo ""
+          echo "Components:"
+          echo "- AERMOD: ${{ needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
+          echo "- AERMET: ${{ needs.check-for-new-versions.outputs.aermet_new_version || needs.check-for-new-versions.outputs.aermet_current_version }}"
+          echo "- AERMAP: ${{ needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}"
+          
+          # Calculate suite version
+          AERMOD_VERSION="${{ needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
+          AERMET_VERSION="${{ needs.check-for-new-versions.outputs.aermet_new_version || needs.check-for-new-versions.outputs.aermet_current_version }}"
+          AERMAP_VERSION="${{ needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}"
+          
+          if [ "$AERMOD_VERSION" == "$AERMET_VERSION" ] && [ "$AERMET_VERSION" == "$AERMAP_VERSION" ]; then
+            SUITE_VERSION="$AERMOD_VERSION"
+          else
+            SUITE_VERSION="${AERMOD_VERSION}-${AERMET_VERSION}-${AERMAP_VERSION}"
+          fi
+          
+          echo "AERMOD Suite version: $SUITE_VERSION"
+
   create-issue-on-failure:
     name: Create Issue on Failure
-    needs: [check-for-new-versions, update-formulas, test-aermod, test-aermet, test-aermap]
+    needs: [check-for-new-versions, update-formulas, test-aermod, test-aermet, test-aermap, test-aermod-suite, audit-and-style-fix]
     if: failure() && (needs.check-for-new-versions.outputs.any_updates == 'true' || github.event.inputs.force_run == 'true')
     runs-on: ubuntu-latest
     steps:
@@ -883,6 +1119,12 @@ jobs:
           if [ "${{ needs.test-aermap.result }}" == "failure" ]; then
             echo "  - test-aermap" >> ./workflow_failure_issue.md
           fi
+          if [ "${{ needs.test-aermod-suite.result }}" == "failure" ]; then
+            echo "  - test-aermod-suite" >> ./workflow_failure_issue.md
+          fi
+          if [ "${{ needs.audit-and-style-fix.result }}" == "failure" ]; then
+            echo "  - audit-and-style-fix" >> ./workflow_failure_issue.md
+          fi
           echo "" >> ./workflow_failure_issue.md
           echo "Please investigate the workflow logs for more details." >> ./workflow_failure_issue.md
 
@@ -897,7 +1139,7 @@ jobs:
 
   test-summary:
     name: Test Summary
-    needs: [test-aermod, test-aermet, test-aermap]
+    needs: [test-aermod, test-aermet, test-aermap, test-aermod-suite]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -930,6 +1172,14 @@ jobs:
             echo "⏭️ AERMAP: Skipped"
           else
             echo "❌ AERMAP: Failed"
+          fi
+          
+          if [ "${{ needs.test-aermod-suite.result }}" == "success" ]; then
+            echo "✅ AERMOD Suite: Passed"
+          elif [ "${{ needs.test-aermod-suite.result }}" == "skipped" ]; then
+            echo "⏭️ AERMOD Suite: Skipped"
+          else
+            echo "❌ AERMOD Suite: Failed"
           fi
           
           echo ""

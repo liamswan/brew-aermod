@@ -145,3 +145,15 @@ This project is provided under the MIT License. The AERMOD suite itself is devel
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Sources and References
+
+The following resources were used in developing this Homebrew tap:
+
+* [UBC EOAS AERMOD/AERMET/AERMAP 2024 Guide](https://www.eoas.ubc.ca/courses/atsc507/ADM/aermod/aermod_aermet_aermap_2024-v2.pdf) - Detailed step-by-step compilation instructions for Linux/macOS
+* [EPA SCRAM Site](https://www.epa.gov/scram) - Official source code downloads for:
+  * [AERMOD](https://www.epa.gov/scram/air-quality-dispersion-modeling-preferred-and-recommended-models#aermod)
+  * [AERMET](https://www.epa.gov/scram/meteorological-processors-and-accessory-programs#aermet)
+  * [AERMAP](https://www.epa.gov/scram/air-quality-dispersion-modeling-related-model-support-programs#aermap)
+* Compilation approach based on EPA-provided build scripts and compiler flags
+* Cross-platform support for both macOS and Linux via Homebrew's package management system
