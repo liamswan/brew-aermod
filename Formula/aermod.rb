@@ -1,5 +1,5 @@
 class Aermod < Formula
-  desc "EPA AERMOD air dispersion model (built from source)"
+  desc "EPA air dispersion model (built from source)"
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-preferred-and-recommended-models#aermod"
   license :public_domain
   version "24142"
@@ -182,12 +182,12 @@ class Aermod < Formula
       
       # Make sure we can find module files during compilation
       ohai "Compiling #{src}"
-      system("gfortran", "-c", "-J.", *compile_flags, src)
+      system "gfortran", "-c", "-J.", *compile_flags, src
       
       # Check if compilation succeeded
       unless $?.success?
         ohai "Failed to compile #{src}, checking for the file..."
-        system("ls", "-la", src) if File.exist?(src)
+        system "ls", "-la", src if File.exist?(src)
         odie "Compilation failed for #{src}"
       end
       
@@ -207,7 +207,7 @@ class Aermod < Formula
     ohai "Linking #{unique_object_files.size} object files: #{unique_object_files.join(", ")}"
     
     # Link only unique object files
-    system("gfortran", "-o", "aermod", *link_flags, *unique_object_files)
+    system "gfortran", "-o", "aermod", *link_flags, *unique_object_files
     
     # Handle the executable
     if File.exist?("aermod.exe")
