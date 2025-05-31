@@ -2,6 +2,15 @@
 
 # Simple Homebrew Installation Script
 
+# Set script timeout and download limits
+export HOMEBREW_CURL_RETRIES=2
+export HOMEBREW_CURL_CONNECT_TIMEOUT=15
+export HOMEBREW_CLEANUP_MAX_AGE_DAYS=120
+export HOMEBREW_NO_ANALYTICS=1
+export HOMEBREW_NO_AUTO_UPDATE=1
+export HOMEBREW_NO_INSTALL_FROM_API=1
+export HOMEBREW_NO_INSTALL_CLEANUP=1
+
 # Determine script directory to find Formula directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
@@ -134,9 +143,6 @@ if command -v brew >/dev/null 2>&1; then
   # Prepare for offline use
   echo "Preparing Homebrew for potential offline use..."
   
-  # Disable auto-update behavior
-  export HOMEBREW_NO_AUTO_UPDATE=1
-  
   # Add to shell profile if needed
   if [[ -n "$SHELL" ]] && [[ "$SHELL" == *"zsh"* ]]; then
     if [[ -f ~/.zshrc ]]; then
@@ -149,27 +155,44 @@ if command -v brew >/dev/null 2>&1; then
   # Disable analytics
   brew analytics off
   
-  # Add a timeout for brew operations to prevent hanging
-  export HOMEBREW_CURL_RETRIES=3
-  export HOMEBREW_CURL_CONNECT_TIMEOUT=30
+  # Limit the number of dependencies to download to avoid timeout
+  # This is especially important in CI environments
+  echo "Downloading essential dependencies for offline use..."
   
-  # Prefetch core dependencies that might be needed
-  echo "Downloading core dependencies for offline use..."
-  brew fetch --deps gcc gfortran || echo "Warning: Could not fetch all core dependencies, but continuing"
+  # First, try to install GCC directly - this is the most essential package
+  # Use a timeout to prevent hanging
+  timeout 300 brew install gcc || echo "Warning: Could not install gcc directly, will try fetching instead"
   
-  # Download formula dependencies for our custom formulas if they exist
+  # If we have limited time, focus on the most important dependencies only
+  echo "Fetching critical dependencies..."
+  brew fetch --deps gcc || echo "Warning: Could not fetch all core dependencies, but continuing"
+  
+  # Only try to download formula dependencies if there's likely time remaining
+  # and the Formula directory exists
   if [[ -d "${ROOT_DIR}/Formula" ]]; then
-    echo "Downloading dependencies for AERMOD suite formulas..."
+    echo "Checking AERMOD suite formulas..."
+    
+    # Use a counter to limit the number of formulas we process
+    MAX_FORMULAS=3
+    FORMULA_COUNT=0
+    
     # Use find to get all .rb files
     for formula in "${ROOT_DIR}/Formula/"*.rb; do
-      if [[ -f "$formula" ]]; then
+      if [[ -f "$formula" ]] && [[ "$FORMULA_COUNT" -lt "$MAX_FORMULAS" ]]; then
         formula_name=$(basename "$formula" .rb)
         echo "Fetching dependencies for $formula_name..."
-        brew fetch --deps --formula "$formula" || echo "Warning: Could not fetch all dependencies for $formula_name"
+        
+        # Use a timeout to prevent hanging
+        timeout 60 brew fetch --deps --formula "$formula" || echo "Warning: Could not fetch all dependencies for $formula_name"
+        
+        # Increment the counter
+        ((FORMULA_COUNT++))
       fi
     done
+    
+    echo "Processed $FORMULA_COUNT formulas"
   else
-    echo "No Formula directory found at ${ROOT_DIR}/Formula"
+    echo "No Formula directory found at ${ROOT_DIR}/Formula or skipping to save time"
   fi
   
   echo "Homebrew setup complete and prepared for offline use!"
