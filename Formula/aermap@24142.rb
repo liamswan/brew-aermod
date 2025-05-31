@@ -1,3 +1,4 @@
+require 'English'
 class AermapAT24142 < Formula
   desc "EPA terrain processor for AERMOD (built from source)"
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-related-model-support-programs#aermap"
@@ -66,27 +67,27 @@ class AermapAT24142 < Formula
       sub_utmgeo.f
       sub_read_tifftags.f
     ]
-    
+
     # Filter to only include files that exist
     all_source_files = Dir["*.f", "*.f90"]
     existing_ordered_files = ordered_files.select { |f| all_source_files.include?(f) }
-    
+
     # Add any remaining files not in our ordered list
     remaining_files = all_source_files - existing_ordered_files
     source_files = existing_ordered_files + remaining_files
-    
+
     if source_files.empty?
       odie "No source files found. Check ZIP structure."
     end
-    
+
     ENV.deparallelize
-    
+
     # Compile all files in the determined order
     source_files.each do |src|
       system "gfortran", "-c", "-J.", *compile_flags, src
-      
+
       # Check if compilation succeeded
-      unless $?.success?
+      unless $CHILD_STATUS.success?
         ohai "Failed to compile #{src}"
         system "ls", "-la", src if File.exist?(src)
         odie "Compilation failed for #{src}"

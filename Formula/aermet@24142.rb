@@ -1,3 +1,4 @@
+require 'English'
 class AermetAT24142 < Formula
   desc "EPA meteorological preprocessor for AERMOD (built from source)"
   homepage "https://www.epa.gov/scram/meteorological-processors-and-accessory-programs#aermet"
@@ -21,7 +22,7 @@ class AermetAT24142 < Formula
     if build.with?("version")
       version_arg = build.value("version")
       version_resource = "aermet_#{version_arg}"
-      if !resource_exists?(version_resource)
+      unless resource_exists?(version_resource)
         odie("Version #{version_arg} is not available. Please choose a valid version or omit the --with-version option.")
       end
       resource(version_resource).stage { buildpath.install(Dir["*"]) }
@@ -54,29 +55,29 @@ class AermetAT24142 < Formula
       mod_reports.f90
       mod_misc.f90
     ]
-    
+
     # Get all source files
     all_source_files = Dir["*.f", "*.f90"].sort
-    
+
     # Filter to only include files that exist
     ordered_modules = ordered_modules.select { |f| all_source_files.include?(f) }
-    
+
     # Add any remaining files not in our ordered list
     remaining_files = all_source_files - ordered_modules
     source_files = ordered_modules + remaining_files
-    
+
     if source_files.empty?
       odie "No source files found. Check ZIP structure."
     end
-    
+
     ENV.deparallelize
-    
+
     # Compile all files in the determined order
     source_files.each do |src|
       system "gfortran", "-c", "-J.", *compile_flags, src
-      
+
       # Check if compilation succeeded
-      unless $?.success?
+      unless $CHILD_STATUS.success?
         ohai "Failed to compile #{src}"
         system "ls", "-la", src if File.exist?(src)
         odie "Compilation failed for #{src}"
