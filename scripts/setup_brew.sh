@@ -151,11 +151,8 @@ if command -v brew >/dev/null 2>&1; then
     fi
   fi
   
-  # Run basic brew commands to verify functionality
+  # Run a quick check to verify Homebrew functionality
   echo "Testing Homebrew functionality..."
-  brew doctor || echo "Brew doctor reported issues, but continuing..."
-  
-  # Verify the brew command works by checking its location
   echo "Using Homebrew from: $BREW_PATH"
   
   # Test if brew can run a simple command
@@ -174,24 +171,15 @@ if command -v brew >/dev/null 2>&1; then
   # Disable analytics
   brew analytics off
   
-  # Skip downloading dependencies to avoid timeouts in test environments
-  if [[ -n "$CI" || -n "$GITHUB_ACTIONS" ]]; then
-    echo "Detected CI environment. Skipping dependency downloads to avoid timeouts."
-  else
-    # Only download the most critical dependencies with a timeout
-    echo "Downloading minimal core dependencies for offline use..."
-    timeout 60 brew fetch gcc || echo "Warning: Could not fetch gcc, but continuing"
-    
-    # Check for Formula directory but limit downloads
-    if [[ -d "${ROOT_DIR}/Formula" ]]; then
-      echo "Checking for AERMOD suite formulas..."
-      # Only try downloading for one formula to save time
-      if FIRST_FORMULA=$(find "${ROOT_DIR}/Formula/" -name "*.rb" | head -n 1); then
-        if [[ -f "$FIRST_FORMULA" ]]; then
-          formula_name=$(basename "$FIRST_FORMULA" .rb)
-          echo "Fetching dependencies for $formula_name only (to save time)..."
-          timeout 30 brew fetch --deps --formula "$FIRST_FORMULA" || echo "Warning: Could not fetch all dependencies for $formula_name"
-        fi
+  # Check for Formula directory but limit downloads
+  if [[ -d "${ROOT_DIR}/Formula" ]]; then
+    echo "Checking for AERMOD suite formulas..."
+    # Only try downloading for one formula to save time
+    if FIRST_FORMULA=$(find "${ROOT_DIR}/Formula/" -name "*.rb" | head -n 1); then
+      if [[ -f "$FIRST_FORMULA" ]]; then
+        formula_name=$(basename "$FIRST_FORMULA" .rb)
+        echo "Fetching dependencies for $formula_name only (to save time)..."
+        timeout 30 brew fetch --deps --formula "$FIRST_FORMULA" || echo "Warning: Could not fetch all dependencies for $formula_name"
       fi
     fi
   fi
