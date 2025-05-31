@@ -1,5 +1,5 @@
 class AermapAT24142 < Formula
-  desc "EPA AERMAP terrain processor (built from source)"
+  desc "EPA terrain processor for AERMOD (built from source)"
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-related-model-support-programs#aermap"
   license :public_domain
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_source.zip"
@@ -83,22 +83,22 @@ class AermapAT24142 < Formula
     
     # Compile all files in the determined order
     source_files.each do |src|
-      system("gfortran", "-c", "-J.", *compile_flags, src)
+      system "gfortran", "-c", "-J.", *compile_flags, src
       
       # Check if compilation succeeded
       unless $?.success?
         ohai "Failed to compile #{src}"
-        system("ls", "-la", src) if File.exist?(src)
+        system "ls", "-la", src if File.exist?(src)
         odie "Compilation failed for #{src}"
       end
     end
 
     # Link everything
     object_files = source_files.map { |f| File.basename(f, File.extname(f)) + ".o" }
-    system("gfortran", "-o", "aermap", *link_flags, *object_files)
+    system "gfortran", "-o", "aermap", *link_flags, *object_files
 
     # Install
-    bin.install("aermap")
+    bin.install "aermap"
   end
 
   test do
