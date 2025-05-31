@@ -609,7 +609,6 @@ jobs:
               echo "No components to update"
             fi
           fi
-          fi
           
           # Add information about README update
           echo "## Documentation" >> release_assets/changes.md
