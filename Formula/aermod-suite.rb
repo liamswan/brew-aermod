@@ -1,5 +1,6 @@
 require "English"
 class AermodSuite < Formula
+  # AERMOD Suite with components: AERMOD 24142, AERMET 24142, AERMAP 24142
   desc "Meta-formula to install AERMOD and its preprocessors (AERMET, AERMAP)"
   homepage "https://www.epa.gov/scram"
   url "https://github.com/liamswan/brew-aermod/releases/download/v20250530/aermod-suite-2025.tar.gz"
