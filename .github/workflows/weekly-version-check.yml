@@ -734,15 +734,15 @@ jobs:
           echo "Generated on $(date)" >> formula_audit_report.md
           echo "" >> formula_audit_report.md
           
-          # Audit all formulas
-          FORMULAS=$(find Formula -name "*.rb")
+          # Audit all formulas by name instead of path
+          FORMULAS=$(find Formula -name "*.rb" -exec basename {} .rb \;)
           ALL_PASS=true
           
           for formula in $FORMULAS; do
             echo "Auditing $formula..."
             echo "## Auditing $formula" >> formula_audit_report.md
             echo '```' >> formula_audit_report.md
-            if brew audit --strict "$formula"; then
+            if brew audit --strict "liamswan/brew-aermod/$formula"; then
               echo "✅ $formula passed audit" >> formula_audit_report.md
             else
               echo "⚠️ $formula has audit warnings" >> formula_audit_report.md
@@ -771,15 +771,15 @@ jobs:
           echo "Generated on $(date)" >> formula_fix_report.md
           echo "" >> formula_fix_report.md
           
-          # Fix style for all formulas
-          FORMULAS=$(find Formula -name "*.rb")
+          # Fix style for all formulas by name instead of path
+          FORMULAS=$(find Formula -name "*.rb" -exec basename {} .rb \;)
           ALL_FIXED=true
           
           for formula in $FORMULAS; do
             echo "Fixing style for $formula..."
             echo "## Fixing style for $formula" >> formula_fix_report.md
             echo '```' >> formula_fix_report.md
-            if brew style --fix "$formula"; then
+            if brew style --fix "liamswan/brew-aermod/$formula"; then
               echo "✅ $formula style fixed or already good" >> formula_fix_report.md
             else
               echo "⚠️ $formula has style issues that couldn't be automatically fixed" >> formula_fix_report.md
@@ -800,9 +800,11 @@ jobs:
       - name: Check for changes to commit
         id: check_style_changes
         run: |
+          # Add Formula directory to staging
           git add Formula/
-          git diff-index --quiet HEAD --
-          if [ $? -eq 0 ]; then
+          
+          # Check if there are changes to commit, but handle the exit code properly
+          if git diff-index --quiet HEAD -- Formula/; then
             echo "no_style_changes=true" >> $GITHUB_OUTPUT
             echo "No style changes to commit."
           else
@@ -817,7 +819,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
           
           git commit -m "Apply brew style fixes [automated]"
-          git push
+          git push || echo "::warning::Failed to push changes, but continuing with workflow"
       
       - name: Check existence of report files
         id: check_report_files
@@ -1186,7 +1188,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Prepare issue content
         id: prepare-issue
