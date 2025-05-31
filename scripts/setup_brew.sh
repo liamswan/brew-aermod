@@ -26,8 +26,23 @@ if [[ "$OS" == "Darwin" ]]; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
 elif [[ "$OS" == "Linux" ]]; then
   # Linux
-  echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.profile
+  # Determine if running as root
+  if [[ $EUID -eq 0 ]]; then
+    # Running as root
+    echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /root/.bashrc
+    echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /root/.profile
+  else
+    # Running as regular user
+    echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+    echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.profile
+  fi
+  
+  # Apply to current shell session
   eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+  
+  # Recommend installing dependencies
+  echo "You may need to install build dependencies with:"
+  echo "sudo apt-get install build-essential"
 else
   echo "Unsupported operating system: $OS"
   exit 1
