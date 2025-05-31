@@ -23,8 +23,20 @@ jobs:
 
       - name: Add tap
         run: |
-          brew tap liamswan/homebrew-aermod "$(pwd)"
+          brew tap liamswan/homebrew-aermod https://github.com/liamswan/homebrew-aermod
+          brew tap-info liamswan/homebrew-aermod
 
+      # Configure local tap for development
+      - name: Link local repo to tap
+        run: |
+          TAPDIR="$(brew --repository)/Library/Taps/liamswan/homebrew-aermod"
+          rm -rf "$TAPDIR"
+          mkdir -p "$(dirname $TAPDIR)"
+          ln -s "$(pwd)" "$TAPDIR"
+          echo "Tap directory: $TAPDIR"
+          ls -la "$TAPDIR"
+          
+      # Continue with the rest of the workflow
       - name: Brew audit
         run: |
           # Create a list of formulas
