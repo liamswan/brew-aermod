@@ -55,7 +55,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       
@@ -189,7 +189,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       # Download and update AERMOD if needed
       - name: Download new AERMOD version
@@ -719,7 +719,7 @@ jobs:
         uses: Homebrew/actions/setup-homebrew@master
       
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
       
@@ -838,7 +838,7 @@ jobs:
           fi
       
       - name: Upload audit and style reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: formula-reports
           path: |
@@ -1186,7 +1186,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Prepare issue content
         id: prepare-issue
