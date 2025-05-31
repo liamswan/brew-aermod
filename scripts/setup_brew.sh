@@ -2,15 +2,6 @@
 
 # Simple Homebrew Installation Script
 
-# Set script timeout and download limits
-export HOMEBREW_CURL_RETRIES=2
-export HOMEBREW_CURL_CONNECT_TIMEOUT=15
-export HOMEBREW_CLEANUP_MAX_AGE_DAYS=120
-export HOMEBREW_NO_ANALYTICS=1
-export HOMEBREW_NO_AUTO_UPDATE=1
-export HOMEBREW_NO_INSTALL_FROM_API=1
-export HOMEBREW_NO_INSTALL_CLEANUP=1
-
 # Determine script directory to find Formula directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
@@ -35,15 +26,42 @@ NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Ho
   exit 1
 }
 
+# Define important Homebrew environment variables
+HOMEBREW_ENV_VARS=(
+  "HOMEBREW_NO_AUTO_UPDATE=1"
+  "HOMEBREW_NO_ANALYTICS=1"
+  "HOMEBREW_NO_INSTALL_CLEANUP=1"
+  "HOMEBREW_CURL_RETRIES=2"
+  "HOMEBREW_CURL_CONNECT_TIMEOUT=15"
+  "HOMEBREW_NO_INSTALL_FROM_API=1"
+  "HOMEBREW_NO_BOTTLE_SOURCE_FALLBACK=1"
+  "HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1"
+)
+
 # Add Homebrew to the shell profile and current environment
 if [[ "$OS" == "Darwin" ]]; then
   # macOS
   if [[ -f ~/.zprofile ]]; then
     echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+    # Add environment variables to ~/.zshrc for persistence
+    if [[ -f ~/.zshrc ]]; then
+      for var in "${HOMEBREW_ENV_VARS[@]}"; do
+        grep -q "$var" ~/.zshrc || echo "export $var" >> ~/.zshrc
+      done
+    fi
   elif [[ -f ~/.bash_profile ]]; then
     echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.bash_profile
+    # Add environment variables to ~/.bashrc for persistence
+    if [[ -f ~/.bashrc ]]; then
+      for var in "${HOMEBREW_ENV_VARS[@]}"; do
+        grep -q "$var" ~/.bashrc || echo "export $var" >> ~/.bashrc
+      done
+    fi
   elif [[ -f ~/.profile ]]; then
     echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.profile
+    for var in "${HOMEBREW_ENV_VARS[@]}"; do
+      grep -q "$var" ~/.profile || echo "export $var" >> ~/.profile
+    done
   fi
   
   # Also add to current shell environment
@@ -62,6 +80,10 @@ elif [[ "$OS" == "Linux" ]]; then
     for profile in /root/.bashrc /root/.bash_profile /root/.profile /root/.zshrc; do
       if [[ -f "$profile" ]]; then
         echo 'eval "$('$LINUX_BREW_PATH' shellenv)"' >> "$profile"
+        # Add environment variables for persistence
+        for var in "${HOMEBREW_ENV_VARS[@]}"; do
+          grep -q "$var" "$profile" || echo "export $var" >> "$profile"
+        done
       fi
     done
   else
@@ -69,6 +91,10 @@ elif [[ "$OS" == "Linux" ]]; then
     for profile in ~/.bashrc ~/.bash_profile ~/.profile ~/.zshrc; do
       if [[ -f "$profile" ]]; then
         echo 'eval "$('$LINUX_BREW_PATH' shellenv)"' >> "$profile"
+        # Add environment variables for persistence
+        for var in "${HOMEBREW_ENV_VARS[@]}"; do
+          grep -q "$var" "$profile" || echo "export $var" >> "$profile"
+        done
       fi
     done
   fi
@@ -140,62 +166,37 @@ if command -v brew >/dev/null 2>&1; then
     exit 1
   fi
   
-  # Prepare for offline use
-  echo "Preparing Homebrew for potential offline use..."
-  
-  # Add to shell profile if needed
-  if [[ -n "$SHELL" ]] && [[ "$SHELL" == *"zsh"* ]]; then
-    if [[ -f ~/.zshrc ]]; then
-      grep -q "HOMEBREW_NO_AUTO_UPDATE" ~/.zshrc || echo 'export HOMEBREW_NO_AUTO_UPDATE=1' >> ~/.zshrc
-    fi
-  elif [[ -f ~/.bashrc ]]; then
-    grep -q "HOMEBREW_NO_AUTO_UPDATE" ~/.bashrc || echo 'export HOMEBREW_NO_AUTO_UPDATE=1' >> ~/.bashrc
-  fi
+  # Apply the environment variables in the current session
+  for var in "${HOMEBREW_ENV_VARS[@]}"; do
+    export "$var"
+  done
   
   # Disable analytics
   brew analytics off
   
-  # Limit the number of dependencies to download to avoid timeout
-  # This is especially important in CI environments
-  echo "Downloading essential dependencies for offline use..."
-  
-  # First, try to install GCC directly - this is the most essential package
-  # Use a timeout to prevent hanging
-  timeout 300 brew install gcc || echo "Warning: Could not install gcc directly, will try fetching instead"
-  
-  # If we have limited time, focus on the most important dependencies only
-  echo "Fetching critical dependencies..."
-  brew fetch --deps gcc || echo "Warning: Could not fetch all core dependencies, but continuing"
-  
-  # Only try to download formula dependencies if there's likely time remaining
-  # and the Formula directory exists
-  if [[ -d "${ROOT_DIR}/Formula" ]]; then
-    echo "Checking AERMOD suite formulas..."
-    
-    # Use a counter to limit the number of formulas we process
-    MAX_FORMULAS=3
-    FORMULA_COUNT=0
-    
-    # Use find to get all .rb files
-    for formula in "${ROOT_DIR}/Formula/"*.rb; do
-      if [[ -f "$formula" ]] && [[ "$FORMULA_COUNT" -lt "$MAX_FORMULAS" ]]; then
-        formula_name=$(basename "$formula" .rb)
-        echo "Fetching dependencies for $formula_name..."
-        
-        # Use a timeout to prevent hanging
-        timeout 60 brew fetch --deps --formula "$formula" || echo "Warning: Could not fetch all dependencies for $formula_name"
-        
-        # Increment the counter
-        ((FORMULA_COUNT++))
-      fi
-    done
-    
-    echo "Processed $FORMULA_COUNT formulas"
+  # Skip downloading dependencies to avoid timeouts in test environments
+  if [[ -n "$CI" || -n "$GITHUB_ACTIONS" ]]; then
+    echo "Detected CI environment. Skipping dependency downloads to avoid timeouts."
   else
-    echo "No Formula directory found at ${ROOT_DIR}/Formula or skipping to save time"
+    # Only download the most critical dependencies with a timeout
+    echo "Downloading minimal core dependencies for offline use..."
+    timeout 60 brew fetch gcc || echo "Warning: Could not fetch gcc, but continuing"
+    
+    # Check for Formula directory but limit downloads
+    if [[ -d "${ROOT_DIR}/Formula" ]]; then
+      echo "Checking for AERMOD suite formulas..."
+      # Only try downloading for one formula to save time
+      if FIRST_FORMULA=$(find "${ROOT_DIR}/Formula/" -name "*.rb" | head -n 1); then
+        if [[ -f "$FIRST_FORMULA" ]]; then
+          formula_name=$(basename "$FIRST_FORMULA" .rb)
+          echo "Fetching dependencies for $formula_name only (to save time)..."
+          timeout 30 brew fetch --deps --formula "$FIRST_FORMULA" || echo "Warning: Could not fetch all dependencies for $formula_name"
+        fi
+      fi
+    fi
   fi
   
-  echo "Homebrew setup complete and prepared for offline use!"
+  echo "Homebrew setup complete and prepared for use!"
 else
   echo "Homebrew installation failed."
   exit 1
