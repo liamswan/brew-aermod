@@ -42,10 +42,18 @@ TEMP_README=$(mktemp)
 # Update the README file
 sed -E "s/- Latest stable version: [0-9]+ \(as of [A-Za-z]+ [0-9]+\)/- Latest stable version: $MAIN_VERSION (as of $CURRENT_DATE)/" "$README_PATH" > "$TEMP_README"
 
-# Update versioned installation lines
-sed -i '' -E "s/brew install aermod@[0-9]+/brew install aermod@$AERMOD_VERSION/" "$TEMP_README"
-sed -i '' -E "s/brew install aermet@[0-9]+/brew install aermet@$AERMET_VERSION/" "$TEMP_README"
-sed -i '' -E "s/brew install aermap@[0-9]+/brew install aermap@$AERMAP_VERSION/" "$TEMP_README"
+# Check OS type to use appropriate sed syntax
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # macOS syntax
+  sed -i '' -E "s/brew install aermod@[0-9]+/brew install aermod@$AERMOD_VERSION/" "$TEMP_README"
+  sed -i '' -E "s/brew install aermet@[0-9]+/brew install aermet@$AERMET_VERSION/" "$TEMP_README"
+  sed -i '' -E "s/brew install aermap@[0-9]+/brew install aermap@$AERMAP_VERSION/" "$TEMP_README"
+else
+  # Linux syntax
+  sed -i -E "s/brew install aermod@[0-9]+/brew install aermod@$AERMOD_VERSION/" "$TEMP_README"
+  sed -i -E "s/brew install aermet@[0-9]+/brew install aermet@$AERMET_VERSION/" "$TEMP_README"
+  sed -i -E "s/brew install aermap@[0-9]+/brew install aermap@$AERMAP_VERSION/" "$TEMP_README"
+fi
 
 # Copy the updated file back to the original
 mv "$TEMP_README" "$README_PATH"

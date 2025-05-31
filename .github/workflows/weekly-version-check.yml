@@ -462,8 +462,8 @@ jobs:
         run: |
           # Add all potentially changed files first
           git add downloads/ checksums/ Formula/
-          git diff-index --quiet HEAD --
-          if [ $? -eq 0 ]; then
+          # Check if there are changes staged for commit
+          if git diff --staged --quiet; then
             echo "no_changes_to_commit=true" >> $GITHUB_OUTPUT
             echo "No changes to commit."
           else
@@ -471,31 +471,14 @@ jobs:
             echo "Changes detected, will commit."
           fi
       
-      - name: Update README with latest versions
-        if: steps.check_commit_changes.outputs.no_changes_to_commit == 'false'
-        run: |
-          # Run the README update script
-          bash scripts/update_readme_versions.sh
-          
-          # Add the updated README to git
-          git add README.md
-          
-          # Check if README was actually modified
-          if git diff-index --quiet HEAD -- README.md; then
-            echo "No changes to README needed"
-          else
-            echo "README updated with new version information"
-          fi
-      
       # Commit all changes
       - name: Commit and push changes
-        if: steps.check_commit_changes.outputs.no_changes_to_commit == 'false'
+        if: steps.check_commit_changes.outputs.no_changes_to_commit != 'true'
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
           # Files are already added in the check_commit_changes step and README update step
-          # git add downloads/ checksums/ Formula/ README.md
           
           # Create commit message based on what was updated
           COMMIT_MSG="Update AERMOD Suite components [automated]:"

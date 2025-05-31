@@ -83,7 +83,7 @@ brew install aermod --without-bounds-check
 
 The following versions are currently available:
 
-- Latest stable version: 24142 (as of May 2025)
+- Latest stable version: 24142 (as of June 2025)
 - Versioned installations:
   - `brew install aermod@24142`
   - `brew install aermet@24142`
