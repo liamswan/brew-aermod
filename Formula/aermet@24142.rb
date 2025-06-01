@@ -8,7 +8,7 @@ class AermetAT24142 < Formula
   sha256 "0e13af282c990dd08ec535d9476b850b559fe190a48942f2d0e2be705b43fab2"
 
   resource "aermet_24142" do
-    url "https://github.com/liamswan/brew-aermod/releases/download/v20250531/aermet_24142.zip"
+    url "https://github.com/liamswan/homebrew-aermod/releases/download/v20250601/aermet_24142.zip"
     sha256 "0e13af282c990dd08ec535d9476b850b559fe190a48942f2d0e2be705b43fab2"
   end
 

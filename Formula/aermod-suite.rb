@@ -6,7 +6,7 @@ class AermodSuite < Formula
   # This URL will be dynamically updated by the GitHub Actions workflow.
   # It points to the correct repository 'homebrew-aermod'.
   # The tag (v00000000) and filename (aermod-suite-0000.tar.gz) are placeholders.
-  url "https://github.com/liamswan/homebrew-aermod/releases/download/v00000000/aermod-suite-0000.tar.gz"
+  url "https://github.com/liamswan/homebrew-aermod/releases/download/v20250601/aermod-suite-24142.tar.gz"
   license :public_domain
   sha256 "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" # SHA256 for an empty tarball
 
