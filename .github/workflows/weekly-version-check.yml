@@ -412,6 +412,8 @@ jobs:
       - name: Update aermod-suite formula
         run: |
           TAG_DATE=$(date +%Y%m%d)
+          CURRENT_YEAR=$(date +%Y)
+          SUITE_TARBALL_NAME="aermod-suite-${CURRENT_YEAR}.tar.gz"
           
           # Get the latest version of each component
           AERMOD_VERSION="${{ needs.check-for-new-versions.outputs.aermod_update_needed == 'true' && needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
@@ -419,7 +421,6 @@ jobs:
           AERMAP_VERSION="${{ needs.check-for-new-versions.outputs.aermap_update_needed == 'true' && needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}"
           
           # Create a combined version string for the suite
-          # If all components have the same version, use that, otherwise use a dash-separated string
           if [ "$AERMOD_VERSION" == "$AERMET_VERSION" ] && [ "$AERMET_VERSION" == "$AERMAP_VERSION" ]; then
             SUITE_VERSION="$AERMOD_VERSION" # Ensure SUITE_VERSION is assigned
             echo "All components have the same version: $SUITE_VERSION"
@@ -429,8 +430,14 @@ jobs:
           fi
           
           # Update version in aermod-suite.rb
-          sed -i "s/version \"[0-9]*\"/version \"$SUITE_VERSION\"/" Formula/aermod-suite.rb
-          sed -i "s/version \"[0-9]*-[0-9]*-[0-9]*\"/version \"$SUITE_VERSION\"/" Formula/aermod-suite.rb
+          sed -i "s/version \\"[0-9A-Za-z-]*\\"/version \\"$SUITE_VERSION\\"/" Formula/aermod-suite.rb
+          
+          # Update URL in aermod-suite.rb
+          NEW_URL="https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/$SUITE_TARBALL_NAME"
+          # Use a more robust sed pattern to match the full URL line, allowing for different protocols and structures
+          sed -i "s|^  url \\".*\\"|  url \\"$NEW_URL\\"|" Formula/aermod-suite.rb
+          # Ensure the sha256 for the empty tarball is correctly set if it was changed
+          sed -i "s|^  sha256 \\".*\\"|  sha256 \\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\\"|" Formula/aermod-suite.rb
           
           # Update dependencies to use the latest versions
           if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
@@ -510,7 +517,13 @@ jobs:
           echo "" >> release_assets/changes.md
           
           TAG_DATE=$(date +%Y%m%d)
+          CURRENT_YEAR=$(date +%Y)
+          SUITE_TARBALL_NAME="aermod-suite-${CURRENT_YEAR}.tar.gz"
           echo "tag_date=$TAG_DATE" >> $GITHUB_OUTPUT
+          
+          # Create empty tarball for aermod-suite
+          tar czf "release_assets/$SUITE_TARBALL_NAME" --files-from /dev/null
+          echo "Created empty tarball: release_assets/$SUITE_TARBALL_NAME"
           
           # Copy the updated README for release assets
           cp README.md release_assets/README.md

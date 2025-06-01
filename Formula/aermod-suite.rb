@@ -3,9 +3,12 @@ class AermodSuite < Formula
   # AERMOD Suite with components: AERMOD 24142, AERMET 24142, AERMAP 24142
   desc "Meta-formula to install AERMOD and its preprocessors (AERMET, AERMAP)"
   homepage "https://www.epa.gov/scram"
-  url "https://github.com/liamswan/brew-aermod/releases/download/v20250531/aermod-suite-2025.tar.gz"
+  # This URL will be dynamically updated by the GitHub Actions workflow.
+  # It points to the correct repository 'homebrew-aermod'.
+  # The tag (v00000000) and filename (aermod-suite-0000.tar.gz) are placeholders.
+  url "https://github.com/liamswan/homebrew-aermod/releases/download/v00000000/aermod-suite-0000.tar.gz"
   license :public_domain
-  sha256 "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  sha256 "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" # SHA256 for an empty tarball
 
   depends_on "aermap"
   depends_on "aermet"
