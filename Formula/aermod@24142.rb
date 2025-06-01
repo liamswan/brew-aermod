@@ -1,21 +1,21 @@
-require 'English'
+require "English"
 class AermodAT24142 < Formula
   desc "EPA air dispersion model (built from source)"
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-preferred-and-recommended-models#aermod"
-  license :public_domain
-  version "24142"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/preferred/aermod/aermod_source.zip"
+  version "24142"
   sha256 "72965f60b8ee5a43a2668ef648afd9057abe3023a8738f9ab37679217fdc5940"
+  license :public_domain
+
+  option "without-bounds-check", "Disable runtime bounds checking for faster production builds"
+  option "with-version", "Specify a version to install (e.g., --with-version=23132)"
+
+  depends_on "gcc" => :build
 
   resource "aermod_24142" do
     url "https://github.com/liamswan/homebrew-aermod/releases/download/v20250601/aermod_24142.zip"
     sha256 "72965f60b8ee5a43a2668ef648afd9057abe3023a8738f9ab37679217fdc5940"
   end
-
-  depends_on "gcc" => :build
-
-  option "without-bounds-check", "Disable runtime bounds checking for faster production builds"
-  option "with-version", "Specify a version to install (e.g., --with-version=23132)"
 
   def install
     # Stage the specific version resource if requested
@@ -84,9 +84,7 @@ class AermodAT24142 < Formula
     remaining_files = all_source_files - existing_ordered_files
     source_files = existing_ordered_files + remaining_files
 
-    if source_files.empty?
-      odie "No source files found. Check ZIP structure."
-    end
+    odie "No source files found. Check ZIP structure." if source_files.empty?
 
     ENV.deparallelize
 
@@ -95,11 +93,11 @@ class AermodAT24142 < Formula
       system "gfortran", "-c", "-J.", *compile_flags, src
 
       # Check if compilation succeeded
-      unless $CHILD_STATUS.success?
-        ohai "Failed to compile #{src}"
-        system "ls", "-la", src if File.exist?(src)
-        odie "Compilation failed for #{src}"
-      end
+      next if $CHILD_STATUS.success?
+
+      ohai "Failed to compile #{src}"
+      system "ls", "-la", src if File.exist?(src)
+      odie "Compilation failed for #{src}"
     end
 
     # Link everything

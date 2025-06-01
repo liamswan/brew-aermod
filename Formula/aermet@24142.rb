@@ -1,21 +1,21 @@
-require 'English'
+require "English"
 class AermetAT24142 < Formula
   desc "EPA meteorological preprocessor for AERMOD (built from source)"
   homepage "https://www.epa.gov/scram/meteorological-processors-and-accessory-programs#aermet"
-  license :public_domain
-  version "24142"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/met/aermet/aermet_source.zip"
+  version "24142"
   sha256 "0e13af282c990dd08ec535d9476b850b559fe190a48942f2d0e2be705b43fab2"
+  license :public_domain
+
+  option "without-bounds-check", "Disable runtime bounds checking"
+  option "with-version", "Specify a version to install (e.g., --with-version=24142)"
+
+  depends_on "gcc" => :build
 
   resource "aermet_24142" do
     url "https://github.com/liamswan/homebrew-aermod/releases/download/v20250601/aermet_24142.zip"
     sha256 "0e13af282c990dd08ec535d9476b850b559fe190a48942f2d0e2be705b43fab2"
   end
-
-  depends_on "gcc" => :build
-
-  option "without-bounds-check", "Disable runtime bounds checking"
-  option "with-version", "Specify a version to install (e.g., --with-version=24142)"
 
   def install
     # Stage the specific version resource if requested
@@ -66,9 +66,7 @@ class AermetAT24142 < Formula
     remaining_files = all_source_files - ordered_modules
     source_files = ordered_modules + remaining_files
 
-    if source_files.empty?
-      odie "No source files found. Check ZIP structure."
-    end
+    odie "No source files found. Check ZIP structure." if source_files.empty?
 
     ENV.deparallelize
 
@@ -77,11 +75,11 @@ class AermetAT24142 < Formula
       system "gfortran", "-c", "-J.", *compile_flags, src
 
       # Check if compilation succeeded
-      unless $CHILD_STATUS.success?
-        ohai "Failed to compile #{src}"
-        system "ls", "-la", src if File.exist?(src)
-        odie "Compilation failed for #{src}"
-      end
+      next if $CHILD_STATUS.success?
+
+      ohai "Failed to compile #{src}"
+      system "ls", "-la", src if File.exist?(src)
+      odie "Compilation failed for #{src}"
     end
 
     # Link everything

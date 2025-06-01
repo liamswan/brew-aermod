@@ -1,21 +1,21 @@
-require 'English'
+require "English"
 class Aermet < Formula
   desc "EPA meteorological preprocessor for AERMOD (built from source)"
   homepage "https://www.epa.gov/scram/meteorological-processors-and-accessory-programs#aermet"
-  license :public_domain
-  version "24142"
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/met/aermet/aermet_source.zip"
+  version "24142"
   sha256 "0e13af282c990dd08ec535d9476b850b559fe190a48942f2d0e2be705b43fab2"
+  license :public_domain
+
+  option "without-bounds-check", "Disable runtime bounds checking"
+  option "with-version", "Specify a version to install (e.g., --with-version=24142)"
+
+  depends_on "gcc" => :build
 
   resource "aermet_24142" do
     url "https://github.com/liamswan/homebrew-aermod/releases/download/v20250601/aermet_24142.zip"
     sha256 "0e13af282c990dd08ec535d9476b850b559fe190a48942f2d0e2be705b43fab2"
   end
-
-  depends_on "gcc" => :build
-
-  option "without-bounds-check", "Disable runtime bounds checking"
-  option "with-version", "Specify a version to install (e.g., --with-version=24142)"
 
   def install
     # Stage the specific version resource if requested
@@ -38,12 +38,12 @@ class Aermet < Formula
 
     # Compiler setup
     ENV["FC"] = Formula["gcc"].opt_bin/"gfortran"
-    compile_flags = ["-O2", "-fno-common"]  # Add -fno-common to prevent duplicate symbols
+    compile_flags = ["-O2", "-fno-common"] # Add -fno-common to prevent duplicate symbols
     compile_flags += %w[-fbounds-check -Wuninitialized] if build.with?("bounds-check")
     link_flags = %w[-O2]
 
     # Clean up any existing object files to prevent conflicts
-    rm_f Dir["*.o", "*.mod"]
+    rm(Dir["*.o", "*.mod"])
 
     # Check if we have a batch file to use as reference
     bat_file = "#{source_dir}/gfortran-aermet_allwarn.bat"
@@ -61,10 +61,10 @@ class Aermet < Formula
 
       # Extract compile commands in order
       bat_content.each_line do |line|
-        if line.match? /gfortran\s+-c.*\.f/i
+        if line.match?(/gfortran\s+-c.*\.f/i)
           file_match = line.match(/\s+([a-zA-Z0-9_]+\.f[90]*)$/i)
           compile_commands << file_match[1] if file_match
-        elsif line.match? /gfortran.*\.o/i
+        elsif line.match?(/gfortran.*\.o/i)
           link_command = line
         end
       end
@@ -82,7 +82,7 @@ class Aermet < Formula
           if link_objects.any?
             ohai "Using object file order from link command: #{link_objects.join(", ")}"
             # Convert back to source file names for compilation
-            source_files_from_link = link_objects.map { |o| o.sub(/\.o$/, '.f90') }
+            source_files_from_link = link_objects.map { |o| o.sub(/\.o$/, ".f90") }
 
             # Make sure we have all files - add any missing ones from compile_commands
             missing_files = compile_commands - source_files_from_link
@@ -103,7 +103,8 @@ class Aermet < Formula
       ohai "No batch file found, determining module dependencies"
 
       # Define the exact order for critical modules
-      critical_modules = %w[mod_file_units.f90 mod_main1.f90 mod_upperair.f90 mod_surface.f90 mod_onsite.f90 mod_pbl.f90 mod_read_input.f90 mod_reports.f90 mod_misc.f90]
+      critical_modules = %w[mod_file_units.f90 mod_main1.f90 mod_upperair.f90 mod_surface.f90 mod_onsite.f90
+                            mod_pbl.f90 mod_read_input.f90 mod_reports.f90 mod_misc.f90]
 
       # Filter out modules that don't exist in our directory
       existing_critical_modules = critical_modules.select { |f| File.exist?(f) }
@@ -118,9 +119,7 @@ class Aermet < Formula
     end
 
     # Stop if no source files found
-    if source_files.empty?
-      odie "No source files found. Check ZIP structure."
-    end
+    odie "No source files found. Check ZIP structure." if source_files.empty?
 
     ENV.deparallelize
 
@@ -154,9 +153,7 @@ class Aermet < Formula
       object_files << obj_name if File.exist?(obj_name)
     end
 
-    if object_files.empty?
-      odie "No object files were generated. Compilation failed."
-    end
+    odie "No object files were generated. Compilation failed." if object_files.empty?
 
     # Ensure no duplicate object files in the link step
     unique_object_files = object_files.uniq

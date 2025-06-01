@@ -1,21 +1,21 @@
-require 'English'
+require "English"
 class Aermap < Formula
   desc "EPA terrain processor for AERMOD (built from source)"
   homepage "https://www.epa.gov/scram/air-quality-dispersion-modeling-related-model-support-programs#aermap"
-  license :public_domain
   url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_source.zip"
   version "24142"
   sha256 "4b34b39fe0039db114e3e78e3b6faa4797a5f8ee8ca0771db030a9b93ab3bed6"
+  license :public_domain
+
+  option "without-bounds-check", "Disable runtime bounds checking"
+  option "with-version", "Specify a version to install (e.g., --with-version=24142)"
+
+  depends_on "gcc" => :build
 
   resource "aermap_24142" do
     url "https://github.com/liamswan/homebrew-aermod/releases/download/v20250601/aermap_24142.zip"
     sha256 "4b34b39fe0039db114e3e78e3b6faa4797a5f8ee8ca0771db030a9b93ab3bed6"
   end
-
-  depends_on "gcc" => :build
-
-  option "without-bounds-check", "Disable runtime bounds checking"
-  option "with-version", "Specify a version to install (e.g., --with-version=24142)"
 
   def install
     # Stage the specific version resource if requested
@@ -38,12 +38,12 @@ class Aermap < Formula
 
     # Compiler setup
     ENV["FC"] = Formula["gcc"].opt_bin/"gfortran"
-    compile_flags = ["-O2", "-fno-common"]  # Add -fno-common to prevent duplicate symbols
+    compile_flags = ["-O2", "-fno-common"] # Add -fno-common to prevent duplicate symbols
     compile_flags += %w[-fbounds-check -Wuninitialized] if build.with?("bounds-check")
     link_flags = %w[-O2]
 
     # Clean up any existing object files to prevent conflicts
-    rm_f Dir["*.o", "*.mod"]
+    rm(Dir["*.o", "*.mod"])
 
     # Check if we have a batch file to use as reference
     bat_file = "#{source_dir}/gfortran-aermap-64bit.bat"
@@ -61,10 +61,10 @@ class Aermap < Formula
 
       # Extract compile commands in order
       bat_content.each_line do |line|
-        if line.match? /gfortran\s+.*-c.*\.f/i
+        if line.match?(/gfortran\s+.*-c.*\.f/i)
           file_match = line.match(/\s+([a-zA-Z0-9_]+\.f[90]*)$/i)
           compile_commands << file_match[1] if file_match
-        elsif line.match? /gfortran.*\.o/i
+        elsif line.match?(/gfortran.*\.o/i)
           link_command = line
         end
       end
