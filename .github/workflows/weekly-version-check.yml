@@ -250,11 +250,11 @@ jobs:
           # Add or update resource for this version
           if grep -q "resource \"aermod_$NEW_VERSION\"" Formula/aermod.rb; then
             # Update existing resource
-            sed -i "/resource \"aermod_$NEW_VERSION\"/,/end/ s|url \".*\"|url \"https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermod_$NEW_VERSION.zip\"|" Formula/aermod.rb
+            sed -i "/resource \"aermod_$NEW_VERSION\"/,/end/ s|url \".*\"|url \"https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/aermod_$NEW_VERSION.zip\"|" Formula/aermod.rb
             sed -i "/resource \"aermod_$NEW_VERSION\"/,/end/ s/sha256 \"[a-f0-9]*\"/sha256 \"$CHECKSUM\"/" Formula/aermod.rb
           else
             # Add new resource
-            RESOURCE_BLOCK="  resource \"aermod_$NEW_VERSION\" do\n    url \"https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermod_$NEW_VERSION.zip\"\n    sha256 \"$CHECKSUM\"\n  end\n"
+            RESOURCE_BLOCK="  resource \"aermod_$NEW_VERSION\" do\n    url \"https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/aermod_$NEW_VERSION.zip\"\n    sha256 \"$CHECKSUM\"\n  end\n"
             sed -i "/# Versioned resources for specific versions/a\\$RESOURCE_BLOCK" Formula/aermod.rb
           fi
           
@@ -322,11 +322,11 @@ jobs:
           # Add or update resource for this version
           if grep -q "resource \"aermet_$NEW_VERSION\"" Formula/aermet.rb; then
             # Update existing resource
-            sed -i "/resource \"aermet_$NEW_VERSION\"/,/end/ s|url \".*\"|url \"https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermet_$NEW_VERSION.zip\"|" Formula/aermet.rb
+            sed -i "/resource \"aermet_$NEW_VERSION\"/,/end/ s|url \".*\"|url \"https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/aermet_$NEW_VERSION.zip\"|" Formula/aermet.rb
             sed -i "/resource \"aermet_$NEW_VERSION\"/,/end/ s/sha256 \"[a-f0-9]*\"/sha256 \"$CHECKSUM\"/" Formula/aermet.rb
           else
             # Add new resource
-            RESOURCE_BLOCK="  resource \"aermet_$NEW_VERSION\" do\n    url \"https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermet_$NEW_VERSION.zip\"\n    sha256 \"$CHECKSUM\"\n  end\n"
+            RESOURCE_BLOCK="  resource \"aermet_$NEW_VERSION\" do\n    url \"https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/aermet_$NEW_VERSION.zip\"\n    sha256 \"$CHECKSUM\"\n  end\n"
             sed -i "/# Versioned resources for specific versions/a\\$RESOURCE_BLOCK" Formula/aermet.rb
           fi
           
@@ -394,11 +394,11 @@ jobs:
           # Add or update resource for this version
           if grep -q "resource \"aermap_$NEW_VERSION\"" Formula/aermap.rb; then
             # Update existing resource
-            sed -i "/resource \"aermap_$NEW_VERSION\"/,/end/ s|url \".*\"|url \"https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermap_$NEW_VERSION.zip\"|" Formula/aermap.rb
+            sed -i "/resource \"aermap_$NEW_VERSION\"/,/end/ s|url \".*\"|url \"https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/aermap_$NEW_VERSION.zip\"|" Formula/aermap.rb
             sed -i "/resource \"aermap_$NEW_VERSION\"/,/end/ s/sha256 \"[a-f0-9]*\"/sha256 \"$CHECKSUM\"/" Formula/aermap.rb
           else
             # Add new resource
-            RESOURCE_BLOCK="  resource \"aermap_$NEW_VERSION\" do\n    url \"https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermap_$NEW_VERSION.zip\"\n    sha256 \"$CHECKSUM\"\n  end\n"
+            RESOURCE_BLOCK="  resource \"aermap_$NEW_VERSION\" do\n    url \"https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/aermap_$NEW_VERSION.zip\"\n    sha256 \"$CHECKSUM\"\n  end\n"
             sed -i "/# Versioned resources for specific versions/a\\$RESOURCE_BLOCK" Formula/aermap.rb
           fi
           
@@ -521,6 +521,7 @@ jobs:
           
           # Process each component
           components=0
+          has_updates=false
           
           # If this is a manual version check, we need to create the release assets without downloads
           if [ "${{ github.event.inputs.manual_version_check }}" == "true" ]; then
@@ -550,23 +551,24 @@ jobs:
               echo "" >> release_assets/changes.md
             fi
             
-            # Set output
-            echo "has_updates=true" >> $GITHUB_OUTPUT
-            echo "Created manual update for $components component(s)"
+            if [ "$components" -gt 0 ]; then
+              has_updates=true
+            fi
           else
             # Standard automatic version check processing
             if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
               components=$((components + 1))
               # Validate and copy AERMOD files
               if [ -f "downloads/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip" ]; then
-                # Just copy directly - do not rename the file
-                cp downloads/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip release_assets/
-                cp checksums/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.sha256 release_assets/
+                # Copy the file to release_assets directory
+                cp "downloads/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip" release_assets/
+                cp "checksums/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.sha256" release_assets/
                 echo "## AERMOD" >> release_assets/changes.md
                 echo "- Updated to version ${{ needs.check-for-new-versions.outputs.aermod_new_version }}" >> release_assets/changes.md
-                echo "- Download URL: https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip" >> release_assets/changes.md
+                echo "- Download URL: https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip" >> release_assets/changes.md
                 echo "- SHA256: $(cat checksums/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.sha256)" >> release_assets/changes.md
                 echo "" >> release_assets/changes.md
+                has_updates=true
               else
                 echo "::error::AERMOD files not found for release preparation"
               fi
@@ -576,14 +578,15 @@ jobs:
               components=$((components + 1))
               # Validate and copy AERMET files
               if [ -f "downloads/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip" ]; then
-                # Just copy directly - do not rename the file
-                cp downloads/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip release_assets/
-                cp checksums/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.sha256 release_assets/
+                # Copy the file to release_assets directory
+                cp "downloads/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip" release_assets/
+                cp "checksums/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.sha256" release_assets/
                 echo "## AERMET" >> release_assets/changes.md
                 echo "- Updated to version ${{ needs.check-for-new-versions.outputs.aermet_new_version }}" >> release_assets/changes.md
-                echo "- Download URL: https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip" >> release_assets/changes.md
+                echo "- Download URL: https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip" >> release_assets/changes.md
                 echo "- SHA256: $(cat checksums/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.sha256)" >> release_assets/changes.md
                 echo "" >> release_assets/changes.md
+                has_updates=true
               else
                 echo "::error::AERMET files not found for release preparation"
               fi
@@ -593,26 +596,18 @@ jobs:
               components=$((components + 1))
               # Validate and copy AERMAP files
               if [ -f "downloads/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip" ]; then
-                # Just copy directly - do not rename the file
-                cp downloads/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip release_assets/
-                cp checksums/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.sha256 release_assets/
+                # Copy the file to release_assets directory
+                cp "downloads/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip" release_assets/
+                cp "checksums/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.sha256" release_assets/
                 echo "## AERMAP" >> release_assets/changes.md
                 echo "- Updated to version ${{ needs.check-for-new-versions.outputs.aermap_new_version }}" >> release_assets/changes.md
-                echo "- Download URL: https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip" >> release_assets/changes.md
+                echo "- Download URL: https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip" >> release_assets/changes.md
                 echo "- SHA256: $(cat checksums/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.sha256)" >> release_assets/changes.md
                 echo "" >> release_assets/changes.md
+                has_updates=true
               else
                 echo "::error::AERMAP files not found for release preparation"
               fi
-            fi
-            
-            # Set the status
-            if [ "$components" -gt 0 ]; then
-              echo "has_updates=true" >> $GITHUB_OUTPUT
-              echo "Found $components component(s) to update"
-            else
-              echo "has_updates=false" >> $GITHUB_OUTPUT
-              echo "No components to update"
             fi
           fi
           
@@ -682,12 +677,42 @@ jobs:
           
           echo "  - AERMOD-Suite: $SUITE_VERSION (combined version)" >> release_assets/changes.md
           
+          # Output has_updates based on component updates
+          echo "has_updates=$has_updates" >> $GITHUB_OUTPUT
+          
           # List all files in release_assets for debugging
           echo "Files prepared for release:"
           ls -la release_assets/
           
+      # Check if a release with this tag already exists
+      - name: Check for existing release
+        id: check-release
+        if: steps.prepare-assets.outputs.has_updates == 'true'
+        run: |
+          TAG_DATE="${{ steps.prepare-assets.outputs.tag_date }}"
+          if gh release view v$TAG_DATE &> /dev/null; then
+            echo "::warning::Release v$TAG_DATE already exists. Will update it with new assets."
+            echo "release_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "No existing release found for tag v$TAG_DATE."
+            echo "release_exists=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      # Delete existing release if found (optional, only needed if we want to completely recreate)
+      - name: Delete existing release
+        if: steps.prepare-assets.outputs.has_updates == 'true' && steps.check-release.outputs.release_exists == 'true'
+        run: |
+          TAG_DATE="${{ steps.prepare-assets.outputs.tag_date }}"
+          echo "Deleting existing release v$TAG_DATE to ensure clean state..."
+          gh release delete v$TAG_DATE --yes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       # Create GitHub release with appropriate files
       - name: Create GitHub Release
+        id: create-release
         if: steps.prepare-assets.outputs.has_updates == 'true'
         uses: softprops/action-gh-release@v1
         with:
@@ -700,22 +725,90 @@ jobs:
             release_assets/README.md
           draft: false
           prerelease: false
-          fail_on_unmatched_files: false
+          fail_on_unmatched_files: true
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
+      # Comprehensive verification of release assets
       - name: Verify Release Assets
         if: steps.prepare-assets.outputs.has_updates == 'true'
         run: |
           # Wait a bit for the release to be processed
-          sleep 5
+          sleep 10
           
-          # List the release assets for verification
-          echo "Verifying release assets..."
-          gh release view v${{ steps.prepare-assets.outputs.tag_date }} --json assets -q '.assets[].name'
+          TAG_DATE="${{ steps.prepare-assets.outputs.tag_date }}"
+          echo "Verifying release assets for v$TAG_DATE..."
+          
+          # Get the list of assets that should exist based on what was updated
+          declare -a EXPECTED_ASSETS=()
+          
+          # Add README to expected assets
+          EXPECTED_ASSETS+=("README.md")
+          
+          # Add component assets if they were updated
+          if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
+            EXPECTED_ASSETS+=("aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip")
+            EXPECTED_ASSETS+=("aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.sha256")
+          fi
+          
+          if [ "${{ needs.check-for-new-versions.outputs.aermet_update_needed }}" == "true" ]; then
+            EXPECTED_ASSETS+=("aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip")
+            EXPECTED_ASSETS+=("aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.sha256")
+          fi
+          
+          if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ]; then
+            EXPECTED_ASSETS+=("aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip")
+            EXPECTED_ASSETS+=("aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.sha256")
+          fi
+          
+          # Get the actual assets from the release
+          ACTUAL_ASSETS=$(gh release view v$TAG_DATE --json assets -q '.assets[].name')
+          
+          # Print expected and actual assets for debugging
+          echo "Expected assets:"
+          printf "  %s\n" "${EXPECTED_ASSETS[@]}"
+          
+          echo "Actual assets:"
+          echo "$ACTUAL_ASSETS" | tr ' ' '\n' | sed 's/^/  /'
+          
+          # Check that all expected assets exist
+          MISSING_ASSETS=0
+          for asset in "${EXPECTED_ASSETS[@]}"; do
+            if ! echo "$ACTUAL_ASSETS" | grep -q "$asset"; then
+              echo "::error::Missing expected asset: $asset"
+              MISSING_ASSETS=$((MISSING_ASSETS + 1))
+            else
+              echo "✅ Found asset: $asset"
+            fi
+          done
+          
+          # Fail if any assets are missing
+          if [ "$MISSING_ASSETS" -gt 0 ]; then
+            echo "::error::$MISSING_ASSETS expected assets are missing from the release"
+            exit 1
+          else
+            echo "✅ All expected assets are present in the release"
+          fi
+          
+          # Verify the URLs work
+          echo "Verifying asset URLs..."
+          for asset in "${EXPECTED_ASSETS[@]}"; do
+            URL="https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/$asset"
+            echo "Checking URL: $URL"
+            
+            # Use curl to check the URL exists (follow redirects, only get headers)
+            if curl -s -f -L -I "$URL" > /dev/null; then
+              echo "✅ URL accessible: $URL"
+            else
+              echo "::error::URL not accessible: $URL"
+              exit 1
+            fi
+          done
+          
+          echo "✅ All release assets verified successfully"
         env:
-          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   audit-and-style-fix:
     name: Audit and fix formula style
@@ -731,7 +824,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ github.ref }} # Ensure we checkout the correct branch
       
       - name: Run brew audit
         id: audit
@@ -748,26 +841,23 @@ jobs:
           FORMULAS=$(find Formula -name "*.rb" -exec basename {} .rb \;)
           ALL_PASS=true
           
-          for formula in $FORMULAS; do
-            echo "Auditing $formula..."
-            echo "## Auditing $formula" >> formula_audit_report.md
-            echo '```' >> formula_audit_report.md
-            if brew audit --strict "liamswan/brew-aermod/$formula"; then
-              echo "✅ $formula passed audit" >> formula_audit_report.md
+          for formula_name in $FORMULAS; do
+            echo "## Auditing: $formula_name" >> formula_audit_report.md
+            if brew audit "Formula/$formula_name.rb" --strict --online --new-formula; then
+              echo "✅ $formula_name: Passed" >> formula_audit_report.md
             else
-              echo "⚠️ $formula has audit warnings" >> formula_audit_report.md
+              echo "⚠️ $formula_name: Failed or has warnings" >> formula_audit_report.md
+              brew audit "Formula/$formula_name.rb" --strict --online --new-formula >> formula_audit_report.md 2>&1
               ALL_PASS=false
             fi
-            echo '```' >> formula_audit_report.md
             echo "" >> formula_audit_report.md
           done
           
           if [ "$ALL_PASS" = true ]; then
-            echo "audit_success=true" >> $GITHUB_OUTPUT
             echo "All formulas passed audit!"
           else
-            echo "audit_success=false" >> $GITHUB_OUTPUT
             echo "Some formulas have audit warnings. See report for details."
+            # exit 1 # Optionally fail the step if audits don't pass
           fi
       
       - name: Fix formula style
@@ -776,50 +866,52 @@ jobs:
           echo "Running brew style --fix on all formulas..."
           
           # Create a report file
-          touch formula_fix_report.md
-          echo "# Formula Style Fix Report" > formula_fix_report.md
-          echo "Generated on $(date)" >> formula_fix_report.md
-          echo "" >> formula_fix_report.md
+          touch formula_style_fix_report.md
+          echo "# Formula Style Fix Report" > formula_style_fix_report.md
+          echo "Generated on $(date)" >> formula_style_fix_report.md
+          echo "" >> formula_style_fix_report.md
           
           # Fix style for all formulas by name instead of path
           FORMULAS=$(find Formula -name "*.rb" -exec basename {} .rb \;)
-          ALL_FIXED=true
+          ANY_CHANGES=false
           
-          for formula in $FORMULAS; do
-            echo "Fixing style for $formula..."
-            echo "## Fixing style for $formula" >> formula_fix_report.md
-            echo '```' >> formula_fix_report.md
-            if brew style --fix "liamswan/brew-aermod/$formula"; then
-              echo "✅ $formula style fixed or already good" >> formula_fix_report.md
+          for formula_name in $FORMULAS; do
+            echo "## Styling: $formula_name" >> formula_style_fix_report.md
+            # Run brew style --fix on the specific formula file
+            if brew style --fix "Formula/$formula_name.rb"; then
+              echo "✅ $formula_name: Style corrected or already good." >> formula_style_fix_report.md
             else
-              echo "⚠️ $formula has style issues that couldn't be automatically fixed" >> formula_fix_report.md
-              ALL_FIXED=false
+              # Even if it fails, it might have made some changes.
+              # The command exits with non-zero if it makes changes.
+              echo "ℹ️ $formula_name: Style command executed. Check diff for changes." >> formula_style_fix_report.md
             fi
-            echo '```' >> formula_fix_report.md
-            echo "" >> formula_fix_report.md
+            # Check if git status shows changes for this file
+            if ! git diff --quiet "Formula/$formula_name.rb"; then
+              ANY_CHANGES=true
+            fi
+            echo "" >> formula_style_fix_report.md
           done
           
-          if [ "$ALL_FIXED" = true ]; then
-            echo "style_fix_success=true" >> $GITHUB_OUTPUT
-            echo "All formulas have good style or were fixed!"
+          if [ "$ANY_CHANGES" = true ]; then
+            echo "Style fixes were applied to some formulas."
+            echo "style_changes_made=true" >> $GITHUB_OUTPUT
           else
-            echo "style_fix_success=false" >> $GITHUB_OUTPUT
-            echo "Some formulas have style issues that couldn't be automatically fixed. See report for details."
+            echo "No style changes needed or applied."
+            echo "style_changes_made=false" >> $GITHUB_OUTPUT
           fi
       
       - name: Check for changes to commit
         id: check_style_changes
         run: |
-          # Add Formula directory to staging
-          git add Formula/
-          
-          # Check if there are changes to commit, but handle the exit code properly
-          if git diff-index --quiet HEAD -- Formula/; then
-            echo "no_style_changes=true" >> $GITHUB_OUTPUT
+          # Add Formula directory to staging to capture any style fixes
+          git add Formula/*.rb
+          # Check if there are changes staged for commit
+          if git diff --staged --quiet; then
             echo "No style changes to commit."
+            echo "no_style_changes=true" >> $GITHUB_OUTPUT
           else
-            echo "no_style_changes=false" >> $GITHUB_OUTPUT
             echo "Style changes detected, will commit."
+            echo "no_style_changes=false" >> $GITHUB_OUTPUT
           fi
       
       - name: Commit style changes
@@ -870,8 +962,8 @@ jobs:
       
       - name: Add tap
         run: |
-          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
-          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
+          brew tap liamswan/homebrew-aermod
+          brew update # Ensure the tap is up-to-date
       
       - name: Install and test AERMOD
         continue-on-error: true
@@ -956,8 +1048,8 @@ jobs:
       
       - name: Add tap
         run: |
-          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
-          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
+          brew tap liamswan/homebrew-aermod
+          brew update # Ensure the tap is up-to-date
       
       - name: Install and test AERMET
         continue-on-error: true
@@ -1040,8 +1132,8 @@ jobs:
       
       - name: Add tap
         run: |
-          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
-          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
+          brew tap liamswan/homebrew-aermod
+          brew update # Ensure the tap is up-to-date
       
       - name: Install and test AERMAP
         continue-on-error: true
@@ -1125,8 +1217,8 @@ jobs:
       
       - name: Add tap
         run: |
-          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
-          brew tap liamswan/brew-aermod https://github.com/liamswan/brew-aermod
+          brew tap liamswan/homebrew-aermod
+          brew update # Ensure the tap is up-to-date
       
       - name: Install and test AERMOD Suite
         continue-on-error: true
