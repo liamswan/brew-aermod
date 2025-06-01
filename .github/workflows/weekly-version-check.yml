@@ -559,10 +559,12 @@ jobs:
               components=$((components + 1))
               # Validate and copy AERMOD files
               if [ -f "downloads/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip" ]; then
+                # Just copy directly - do not rename the file
                 cp downloads/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip release_assets/
                 cp checksums/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.sha256 release_assets/
                 echo "## AERMOD" >> release_assets/changes.md
                 echo "- Updated to version ${{ needs.check-for-new-versions.outputs.aermod_new_version }}" >> release_assets/changes.md
+                echo "- Download URL: https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip" >> release_assets/changes.md
                 echo "- SHA256: $(cat checksums/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.sha256)" >> release_assets/changes.md
                 echo "" >> release_assets/changes.md
               else
@@ -574,10 +576,12 @@ jobs:
               components=$((components + 1))
               # Validate and copy AERMET files
               if [ -f "downloads/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip" ]; then
+                # Just copy directly - do not rename the file
                 cp downloads/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip release_assets/
                 cp checksums/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.sha256 release_assets/
                 echo "## AERMET" >> release_assets/changes.md
                 echo "- Updated to version ${{ needs.check-for-new-versions.outputs.aermet_new_version }}" >> release_assets/changes.md
+                echo "- Download URL: https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip" >> release_assets/changes.md
                 echo "- SHA256: $(cat checksums/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.sha256)" >> release_assets/changes.md
                 echo "" >> release_assets/changes.md
               else
@@ -589,10 +593,12 @@ jobs:
               components=$((components + 1))
               # Validate and copy AERMAP files
               if [ -f "downloads/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip" ]; then
+                # Just copy directly - do not rename the file
                 cp downloads/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip release_assets/
                 cp checksums/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.sha256 release_assets/
                 echo "## AERMAP" >> release_assets/changes.md
                 echo "- Updated to version ${{ needs.check-for-new-versions.outputs.aermap_new_version }}" >> release_assets/changes.md
+                echo "- Download URL: https://github.com/liamswan/brew-aermod/releases/download/v$TAG_DATE/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip" >> release_assets/changes.md
                 echo "- SHA256: $(cat checksums/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.sha256)" >> release_assets/changes.md
                 echo "" >> release_assets/changes.md
               else
@@ -675,7 +681,11 @@ jobs:
           fi
           
           echo "  - AERMOD-Suite: $SUITE_VERSION (combined version)" >> release_assets/changes.md
-      
+          
+          # List all files in release_assets for debugging
+          echo "Files prepared for release:"
+          ls -la release_assets/
+          
       # Create GitHub release with appropriate files
       - name: Create GitHub Release
         if: steps.prepare-assets.outputs.has_updates == 'true'
@@ -685,8 +695,8 @@ jobs:
           name: AERMOD Suite Update - ${{ steps.prepare-assets.outputs.tag_date }}
           body_path: release_assets/changes.md
           files: |
-            ${{ github.event.inputs.manual_version_check != 'true' && 'release_assets/*.zip' || '' }}
-            ${{ github.event.inputs.manual_version_check != 'true' && 'release_assets/*.sha256' || '' }}
+            release_assets/*.zip
+            release_assets/*.sha256
             release_assets/README.md
           draft: false
           prerelease: false
