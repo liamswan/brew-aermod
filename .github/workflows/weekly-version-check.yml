@@ -746,6 +746,11 @@ jobs:
         with:
           ref: ${{ github.ref }} # Ensure we checkout the correct branch
       
+      - name: Add tap for formula audit and style
+        run: |
+          brew tap liamswan/homebrew-aermod "$(pwd)"
+          brew update
+      
       - name: Run brew audit
         id: audit
         run: |
@@ -763,11 +768,11 @@ jobs:
           
           for formula_name in $FORMULAS; do
             echo "## Auditing: $formula_name" >> formula_audit_report.md
-            if brew audit "Formula/$formula_name.rb" --strict --online --new; then
+            if brew audit "$formula_name" --strict --online --new; then
               echo "✅ $formula_name: Passed" >> formula_audit_report.md
             else
               echo "⚠️ $formula_name: Failed or has warnings" >> formula_audit_report.md
-              brew audit "Formula/$formula_name.rb" --strict --online --new >> formula_audit_report.md 2>&1
+              brew audit "$formula_name" --strict --online --new >> formula_audit_report.md 2>&1
               ALL_PASS=false
             fi
             echo "" >> formula_audit_report.md
@@ -797,8 +802,8 @@ jobs:
           
           for formula_name in $FORMULAS; do
             echo "## Styling: $formula_name" >> formula_style_fix_report.md
-            # Run brew style --fix on the specific formula file
-            if brew style --fix "Formula/$formula_name.rb"; then
+            # Run brew style --fix on the formula name, not the path
+            if brew style --fix "$formula_name"; then
               echo "✅ $formula_name: Style corrected or already good." >> formula_style_fix_report.md
             else
               # Even if it fails, it might have made some changes.
