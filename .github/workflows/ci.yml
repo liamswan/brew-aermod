@@ -1,4 +1,3 @@
-
 name: CI
 
 permissions:
@@ -107,6 +106,26 @@ jobs:
         run: |
           failed_formulas=()
           echo "Installing dependencies and formulas"
+
+          # Add diagnostics for resource URLs
+          echo "Checking resource availability..."
+          for f in Formula/*.rb; do
+            formula_name="$(basename "$f" .rb)"
+            resource_urls=$(grep -o 'url "https://github.com/liamswan/brew-aermod/releases/download/[^"]*"' "$f" | cut -d'"' -f2)
+            
+            if [ -n "$resource_urls" ]; then
+              echo "Resource URLs in $formula_name:"
+              for url in $resource_urls; do
+                echo "  Testing URL: $url"
+                if curl --output /dev/null --silent --head --fail "$url"; then
+                  echo "  ✅ $url is accessible"
+                else
+                  echo "  ❌ $url is NOT accessible (HTTP error)"
+                  failed_formulas+=("$formula_name (resource URL not accessible: $url)")
+                fi
+              done
+            fi
+          done
 
           for f in Formula/*.rb; do
             formula_name="$(basename "$f" .rb)"
