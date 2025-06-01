@@ -518,6 +518,10 @@ jobs:
           
           # Copy the updated README for release assets
           cp README.md release_assets/README.md
+
+          # Include all existing downloads so older versions remain available
+          cp downloads/*.zip release_assets/ 2>/dev/null || true
+          cp checksums/*.sha256 release_assets/ 2>/dev/null || true
           
           # Process each component
           components=0

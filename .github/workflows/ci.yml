@@ -117,7 +117,7 @@ jobs:
               echo "Resource URLs in $formula_name:"
               for url in $resource_urls; do
                 echo "  Testing URL: $url"
-                if curl --output /dev/null --silent --head --fail "$url"; then
+                if curl --location --silent --head --fail "$url" > /dev/null; then
                   echo "  ✅ $url is accessible"
                 else
                   echo "  ❌ $url is NOT accessible (HTTP error)"
