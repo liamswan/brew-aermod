@@ -766,11 +766,11 @@ jobs:
           
           for formula_name in $FORMULAS; do
             echo "## Auditing: $formula_name" >> formula_audit_report.md
-            if brew audit "Formula/$formula_name.rb" --strict --online --new-formula; then
+            if brew audit "Formula/$formula_name.rb" --strict --online --new; then
               echo "✅ $formula_name: Passed" >> formula_audit_report.md
             else
               echo "⚠️ $formula_name: Failed or has warnings" >> formula_audit_report.md
-              brew audit "Formula/$formula_name.rb" --strict --online --new-formula >> formula_audit_report.md 2>&1
+              brew audit "Formula/$formula_name.rb" --strict --online --new >> formula_audit_report.md 2>&1
               ALL_PASS=false
             fi
             echo "" >> formula_audit_report.md
