@@ -15,7 +15,7 @@ class Aermod < Formula
   depends_on "gcc" => :build
 
   resource "aermod_24142" do
-    url "https://github.com/liamswan/brew-aermod/releases/download/v20250601/aermod_24142.zip"
+    url "https://github.com/liamswan/homebrew-aermod/releases/download/v20250601/aermod_24142.zip"
     sha256 "72965f60b8ee5a43a2668ef648afd9057abe3023a8738f9ab37679217fdc5940"
   end
 
