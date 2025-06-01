@@ -412,7 +412,8 @@ jobs:
       - name: Update aermod-suite formula
         run: |
           TAG_DATE=$(date +%Y%m%d)
-          CURRENT_YEAR=$(date +'%Y') # Define CURRENT_YEAR
+          # CURRENT_YEAR is not strictly needed here if TAG_DATE is YYYYMMDD for the release tag
+          FORMULA_PATH="Formula/aermod-suite.rb"
 
           # Get the latest version of each component
           AERMOD_VERSION="${{ needs.check-for-new-versions.outputs.aermod_update_needed == 'true' && needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
@@ -434,59 +435,65 @@ jobs:
           fi
 
           SUITE_TARBALL_NAME="aermod-suite-${SUITE_VERSION}.tar.gz"
-          NEW_URL="https://github.com/liamswan/homebrew-aermod/releases/download/v${CURRENT_YEAR}${TAG_DATE}/${SUITE_TARBALL_NAME}"
+          # Corrected NEW_URL construction to use v${TAG_DATE}
+          NEW_URL="https://github.com/liamswan/homebrew-aermod/releases/download/v${TAG_DATE}/${SUITE_TARBALL_NAME}"
 
-          echo "Updating Formula/aermod-suite.rb with SUITE_VERSION: $SUITE_VERSION and NEW_URL: $NEW_URL"
+          echo "Updating $FORMULA_PATH with SUITE_VERSION: $SUITE_VERSION and NEW_URL: $NEW_URL"
 
           # Update version in aermod-suite.rb
-          # Handle both simple numeric and compound versions
-          sed -i -E 's/^  version ".*"/  version "'"$SUITE_VERSION"'"/' Formula/aermod-suite.rb
+          # If version line exists, update it. Otherwise, add it after the homepage line.
+          if grep -q '^  version "' "$FORMULA_PATH"; then
+            sed -i -E 's/^  version ".*"/  version "'"$SUITE_VERSION"'"/' "$FORMULA_PATH"
+          else
+            sed -i -E '/^  homepage /a\\  version "'"$SUITE_VERSION"'"' "$FORMULA_PATH"
+          fi
 
           # Update URL in aermod-suite.rb
-          # Ensure the pattern matches the placeholder URL correctly
-          sed -i -E 's|^  url "https://github.com/liamswan/homebrew-aermod/releases/download/v[0-9]+/aermod-suite-[0-9]+\.tar\.gz"|  url "'"$NEW_URL"'"|' Formula/aermod-suite.rb
+          # Use a more robust regex for the filename part to handle simple and compound versions.
+          # The v[0-9]+ part for the tag is general enough.
+          sed -i -E 's|^  url "https://github.com/liamswan/homebrew-aermod/releases/download/v[0-9]+/aermod-suite-[0-9.-]+\\.tar\\.gz"|  url "'"$NEW_URL"'"|' "$FORMULA_PATH"
           
           # Update dependencies to use the latest versions
           # Ensure these sed commands correctly target existing dependency lines, whether versioned or not.
           # If aermod was updated, update its dependency
           if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ] || [ "${{ github.event.inputs.force_run }}" == "true" ]; then
             # Try updating if versioned, then if not versioned
-            if grep -q "depends_on \\"aermod@[0-9]*\\"" Formula/aermod-suite.rb; then
-              sed -i "s/depends_on \\"aermod@[0-9]*\\"/depends_on \\"aermod@$AERMOD_VERSION\\"/" Formula/aermod-suite.rb
-            elif grep -q "depends_on \\"aermod\\"" Formula/aermod-suite.rb; then
-              sed -i "s/depends_on \\"aermod\\"/depends_on \\"aermod@$AERMOD_VERSION\\"/" Formula/aermod-suite.rb
+            if grep -q "depends_on \\"aermod@[0-9]*\\"" "$FORMULA_PATH"; then
+              sed -i "s/depends_on \\"aermod@[0-9]*\\"/depends_on \\"aermod@$AERMOD_VERSION\\"/" "$FORMULA_PATH"
+            elif grep -q "depends_on \\"aermod\\"" "$FORMULA_PATH"; then
+              sed -i "s/depends_on \\"aermod\\"/depends_on \\"aermod@$AERMOD_VERSION\\"/" "$FORMULA_PATH"
             else
-              echo "No existing aermod dependency found to update in aermod-suite.rb"
+              echo "No existing aermod dependency found to update in $FORMULA_PATH"
             fi
           fi
 
           if [ "${{ needs.check-for-new-versions.outputs.aermet_update_needed }}" == "true" ] || [ "${{ github.event.inputs.force_run }}" == "true" ]; then
-            if grep -q "depends_on \\"aermet@[0-9]*\\"" Formula/aermod-suite.rb; then
-              sed -i "s/depends_on \\"aermet@[0-9]*\\"/depends_on \\"aermet@$AERMET_VERSION\\"/" Formula/aermod-suite.rb
-            elif grep -q "depends_on \\"aermet\\"" Formula/aermod-suite.rb; then
-              sed -i "s/depends_on \\"aermet\\"/depends_on \\"aermet@$AERMET_VERSION\\"/" Formula/aermod-suite.rb
+            if grep -q "depends_on \\"aermet@[0-9]*\\"" "$FORMULA_PATH"; then
+              sed -i "s/depends_on \\"aermet@[0-9]*\\"/depends_on \\"aermet@$AERMET_VERSION\\"/" "$FORMULA_PATH"
+            elif grep -q "depends_on \\"aermet\\"" "$FORMULA_PATH"; then
+              sed -i "s/depends_on \\"aermet\\"/depends_on \\"aermet@$AERMET_VERSION\\"/" "$FORMULA_PATH"
             else
-              echo "No existing aermet dependency found to update in aermod-suite.rb"
+              echo "No existing aermet dependency found to update in $FORMULA_PATH"
             fi
           fi
 
           if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ] || [ "${{ github.event.inputs.force_run }}" == "true" ]; then
-            if grep -q "depends_on \\"aermap@[0-9]*\\"" Formula/aermod-suite.rb; then
-              sed -i "s/depends_on \\"aermap@[0-9]*\\"/depends_on \\"aermap@$AERMAP_VERSION\\"/" Formula/aermod-suite.rb
-            elif grep -q "depends_on \\"aermap\\"" Formula/aermod-suite.rb; then
-              sed -i "s/depends_on \\"aermap\\"/depends_on \\"aermap@$AERMAP_VERSION\\"/" Formula/aermod-suite.rb
+            if grep -q "depends_on \\"aermap@[0-9]*\\"" "$FORMULA_PATH"; then
+              sed -i "s/depends_on \\"aermap@[0-9]*\\"/depends_on \\"aermap@$AERMAP_VERSION\\"/" "$FORMULA_PATH"
+            elif grep -q "depends_on \\"aermap\\"" "$FORMULA_PATH"; then
+              sed -i "s/depends_on \\"aermap\\"/depends_on \\"aermap@$AERMAP_VERSION\\"/" "$FORMULA_PATH"
             else
-              echo "No existing aermap dependency found to update in aermod-suite.rb"
+              echo "No existing aermap dependency found to update in $FORMULA_PATH"
             fi
           fi
           
           # Add a comment to the formula indicating the component versions
           COMPONENT_VERSIONS="# AERMOD Suite with components: AERMOD $AERMOD_VERSION, AERMET $AERMET_VERSION, AERMAP $AERMAP_VERSION"
-          if grep -q "# AERMOD Suite with components:" Formula/aermod-suite.rb; then
-            sed -i "s|# AERMOD Suite with components:.*|$COMPONENT_VERSIONS|" Formula/aermod-suite.rb
+          if grep -q "# AERMOD Suite with components:" "$FORMULA_PATH"; then
+            sed -i "s|# AERMOD Suite with components:.*|$COMPONENT_VERSIONS|" "$FORMULA_PATH"
           else
             # Insert after the class declaration
-            sed -i "/class AermodSuite < Formula/a\\\\  $COMPONENT_VERSIONS" Formula/aermod-suite.rb
+            sed -i "/class AermodSuite < Formula/a\\  $COMPONENT_VERSIONS" "$FORMULA_PATH"
           fi
       
       # Prepare release assets
@@ -501,7 +508,7 @@ jobs:
           echo "" >> release_assets/changes.md
           
           TAG_DATE=$(date +%Y%m%d)
-          CURRENT_YEAR=$(date +'%Y') # Define CURRENT_YEAR
+          # CURRENT_YEAR definition removed here as it's not essential for tag_date output if TAG_DATE is YYYYMMDD
           echo "tag_date=$TAG_DATE" >> $GITHUB_OUTPUT
           
           # Copy the updated README for release assets
