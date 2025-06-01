@@ -440,11 +440,11 @@ jobs:
 
           # Update version in aermod-suite.rb
           # Handle both simple numeric and compound versions
-          sed -i "s/version \\"[0-9A-Za-z-]*\\"/version \\"$SUITE_VERSION\\"/" Formula/aermod-suite.rb
-          
+          sed -i -E 's/^  version ".*"/  version "'"$SUITE_VERSION"'"/' Formula/aermod-suite.rb
+
           # Update URL in aermod-suite.rb
           # Ensure the pattern matches the placeholder URL correctly
-          sed -i "s|^  url \\"https://github.com/liamswan/homebrew-aermod/releases/download/v[0-9]*/aermod-suite-[0-9]*.tar.gz\\"|  url \\"$NEW_URL\\"|" Formula/aermod-suite.rb
+          sed -i -E 's|^  url "https://github.com/liamswan/homebrew-aermod/releases/download/v[0-9]+/aermod-suite-[0-9]+\.tar\.gz"|  url "'"$NEW_URL"'"|' Formula/aermod-suite.rb
           
           # Update dependencies to use the latest versions
           # Ensure these sed commands correctly target existing dependency lines, whether versioned or not.
