@@ -512,178 +512,104 @@ jobs:
           echo "# Changes in this Release" > release_assets/changes.md
           echo "" >> release_assets/changes.md
           
-          # Get current date for release tag
           TAG_DATE=$(date +%Y%m%d)
           echo "tag_date=$TAG_DATE" >> $GITHUB_OUTPUT
           
           # Copy the updated README for release assets
           cp README.md release_assets/README.md
           
-          # Process each component
-          components=0
-          has_updates=false
-          
-          # If this is a manual version check, we need to create the release assets without downloads
+          has_packaged_assets=false
+
           if [ "${{ github.event.inputs.manual_version_check }}" == "true" ]; then
-            # Add information for manual version update
             echo "## Manual Version Update" >> release_assets/changes.md
-            echo "This release was created with manual version override." >> release_assets/changes.md
+            echo "This release was triggered with manual version check." >> release_assets/changes.md
+            if [ -n "${{ github.event.inputs.aermod_version }}" ]; then
+              echo "- AERMOD version manually set to: ${{ github.event.inputs.aermod_version }}" >> release_assets/changes.md
+            fi
+            if [ -n "${{ github.event.inputs.aermet_version }}" ]; then
+              echo "- AERMET version manually set to: ${{ github.event.inputs.aermet_version }}" >> release_assets/changes.md
+            fi
+            if [ -n "${{ github.event.inputs.aermap_version }}" ]; then
+              echo "- AERMAP version manually set to: ${{ github.event.inputs.aermap_version }}" >> release_assets/changes.md
+            fi
             echo "" >> release_assets/changes.md
-            
-            if [ -n "${{ github.event.inputs.aermod_version }}" ]; then
-              components=$((components + 1))
+          fi
+
+          # AERMOD
+          AERMOD_NEW_VERSION="${{ needs.check-for-new-versions.outputs.aermod_new_version }}"
+          if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
+            if [ -f "downloads/aermod_$AERMOD_NEW_VERSION.zip" ] && [ -f "checksums/aermod_$AERMOD_NEW_VERSION.sha256" ]; then
+              cp "downloads/aermod_$AERMOD_NEW_VERSION.zip" release_assets/
+              cp "checksums/aermod_$AERMOD_NEW_VERSION.sha256" release_assets/
               echo "## AERMOD" >> release_assets/changes.md
-              echo "- Updated to version ${{ github.event.inputs.aermod_version }}" >> release_assets/changes.md
+              echo "- Updated to version $AERMOD_NEW_VERSION" >> release_assets/changes.md
+              echo "- Download URL: https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/aermod_$AERMOD_NEW_VERSION.zip" >> release_assets/changes.md
+              echo "- SHA256: $(cat checksums/aermod_$AERMOD_NEW_VERSION.sha256)" >> release_assets/changes.md
               echo "" >> release_assets/changes.md
+              has_packaged_assets=true
+            else
+              echo "::warning::AERMOD files (downloads/aermod_$AERMOD_NEW_VERSION.zip or checksums/aermod_$AERMOD_NEW_VERSION.sha256) not found for release, though update was needed."
             fi
-            
-            if [ -n "${{ github.event.inputs.aermet_version }}" ]; then
-              components=$((components + 1))
+          fi
+          
+          # AERMET
+          AERMET_NEW_VERSION="${{ needs.check-for-new-versions.outputs.aermet_new_version }}"
+          if [ "${{ needs.check-for-new-versions.outputs.aermet_update_needed }}" == "true" ]; then
+            if [ -f "downloads/aermet_$AERMET_NEW_VERSION.zip" ] && [ -f "checksums/aermet_$AERMET_NEW_VERSION.sha256" ]; then
+              cp "downloads/aermet_$AERMET_NEW_VERSION.zip" release_assets/
+              cp "checksums/aermet_$AERMET_NEW_VERSION.sha256" release_assets/
               echo "## AERMET" >> release_assets/changes.md
-              echo "- Updated to version ${{ github.event.inputs.aermet_version }}" >> release_assets/changes.md
+              echo "- Updated to version $AERMET_NEW_VERSION" >> release_assets/changes.md
+              echo "- Download URL: https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/aermet_$AERMET_NEW_VERSION.zip" >> release_assets/changes.md
+              echo "- SHA256: $(cat checksums/aermet_$AERMET_NEW_VERSION.sha256)" >> release_assets/changes.md
               echo "" >> release_assets/changes.md
+              has_packaged_assets=true
+            else
+              echo "::warning::AERMET files (downloads/aermet_$AERMET_NEW_VERSION.zip or checksums/aermet_$AERMET_NEW_VERSION.sha256) not found for release, though update was needed."
             fi
-            
-            if [ -n "${{ github.event.inputs.aermap_version }}" ]; then
-              components=$((components + 1))
+          fi
+
+          # AERMAP
+          AERMAP_NEW_VERSION="${{ needs.check-for-new-versions.outputs.aermap_new_version }}"
+          if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ]; then
+            if [ -f "downloads/aermap_$AERMAP_NEW_VERSION.zip" ] && [ -f "checksums/aermap_$AERMAP_NEW_VERSION.sha256" ]; then
+              cp "downloads/aermap_$AERMAP_NEW_VERSION.zip" release_assets/
+              cp "checksums/aermap_$AERMAP_NEW_VERSION.sha256" release_assets/
               echo "## AERMAP" >> release_assets/changes.md
-              echo "- Updated to version ${{ github.event.inputs.aermap_version }}" >> release_assets/changes.md
+              echo "- Updated to version $AERMAP_NEW_VERSION" >> release_assets/changes.md
+              echo "- Download URL: https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/aermap_$AERMAP_NEW_VERSION.zip" >> release_assets/changes.md
+              echo "- SHA256: $(cat checksums/aermap_$AERMAP_NEW_VERSION.sha256)" >> release_assets/changes.md
               echo "" >> release_assets/changes.md
-            fi
-            
-            if [ "$components" -gt 0 ]; then
-              has_updates=true
-            fi
-          else
-            # Standard automatic version check processing
-            if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
-              components=$((components + 1))
-              # Validate and copy AERMOD files
-              if [ -f "downloads/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip" ]; then
-                # Copy the file to release_assets directory
-                cp "downloads/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip" release_assets/
-                cp "checksums/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.sha256" release_assets/
-                echo "## AERMOD" >> release_assets/changes.md
-                echo "- Updated to version ${{ needs.check-for-new-versions.outputs.aermod_new_version }}" >> release_assets/changes.md
-                echo "- Download URL: https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.zip" >> release_assets/changes.md
-                echo "- SHA256: $(cat checksums/aermod_${{ needs.check-for-new-versions.outputs.aermod_new_version }}.sha256)" >> release_assets/changes.md
-                echo "" >> release_assets/changes.md
-                has_updates=true
-              else
-                echo "::error::AERMOD files not found for release preparation"
-              fi
-            fi
-            
-            if [ "${{ needs.check-for-new-versions.outputs.aermet_update_needed }}" == "true" ]; then
-              components=$((components + 1))
-              # Validate and copy AERMET files
-              if [ -f "downloads/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip" ]; then
-                # Copy the file to release_assets directory
-                cp "downloads/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip" release_assets/
-                cp "checksums/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.sha256" release_assets/
-                echo "## AERMET" >> release_assets/changes.md
-                echo "- Updated to version ${{ needs.check-for-new-versions.outputs.aermet_new_version }}" >> release_assets/changes.md
-                echo "- Download URL: https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.zip" >> release_assets/changes.md
-                echo "- SHA256: $(cat checksums/aermet_${{ needs.check-for-new-versions.outputs.aermet_new_version }}.sha256)" >> release_assets/changes.md
-                echo "" >> release_assets/changes.md
-                has_updates=true
-              else
-                echo "::error::AERMET files not found for release preparation"
-              fi
-            fi
-            
-            if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ]; then
-              components=$((components + 1))
-              # Validate and copy AERMAP files
-              if [ -f "downloads/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip" ]; then
-                # Copy the file to release_assets directory
-                cp "downloads/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip" release_assets/
-                cp "checksums/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.sha256" release_assets/
-                echo "## AERMAP" >> release_assets/changes.md
-                echo "- Updated to version ${{ needs.check-for-new-versions.outputs.aermap_new_version }}" >> release_assets/changes.md
-                echo "- Download URL: https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.zip" >> release_assets/changes.md
-                echo "- SHA256: $(cat checksums/aermap_${{ needs.check-for-new-versions.outputs.aermap_new_version }}.sha256)" >> release_assets/changes.md
-                echo "" >> release_assets/changes.md
-                has_updates=true
-              else
-                echo "::error::AERMAP files not found for release preparation"
-              fi
+              has_packaged_assets=true
+            else
+              echo "::warning::AERMAP files (downloads/aermap_$AERMAP_NEW_VERSION.zip or checksums/aermap_$AERMAP_NEW_VERSION.sha256) not found for release, though update was needed."
             fi
           fi
           
-          # Add information about README update
           echo "## Documentation" >> release_assets/changes.md
-          echo "- Updated README.md with latest version information" >> release_assets/changes.md
-          echo "- Current versions:" >> release_assets/changes.md
+          echo "- Updated README.md with latest version information (committed separately if changes occurred)." >> release_assets/changes.md
+          echo "- Current versions reflected in this release package:" >> release_assets/changes.md
           
-          if [ "${{ github.event.inputs.manual_version_check }}" == "true" ]; then
-            # Use manual versions for README update
-            if [ -n "${{ github.event.inputs.aermod_version }}" ]; then
-              echo "  - AERMOD: ${{ github.event.inputs.aermod_version }}" >> release_assets/changes.md
-              AERMOD_VERSION="${{ github.event.inputs.aermod_version }}"
-            else
-              echo "  - AERMOD: ${{ needs.check-for-new-versions.outputs.aermod_current_version }}" >> release_assets/changes.md
-              AERMOD_VERSION="${{ needs.check-for-new-versions.outputs.aermod_current_version }}"
-            fi
-            
-            if [ -n "${{ github.event.inputs.aermet_version }}" ]; then
-              echo "  - AERMET: ${{ github.event.inputs.aermet_version }}" >> release_assets/changes.md
-              AERMET_VERSION="${{ github.event.inputs.aermet_version }}"
-            else
-              echo "  - AERMET: ${{ needs.check-for-new-versions.outputs.aermet_current_version }}" >> release_assets/changes.md
-              AERMET_VERSION="${{ needs.check-for-new-versions.outputs.aermet_current_version }}"
-            fi
-            
-            if [ -n "${{ github.event.inputs.aermap_version }}" ]; then
-              echo "  - AERMAP: ${{ github.event.inputs.aermap_version }}" >> release_assets/changes.md
-              AERMAP_VERSION="${{ github.event.inputs.aermap_version }}"
-            else
-              echo "  - AERMAP: ${{ needs.check-for-new-versions.outputs.aermap_current_version }}" >> release_assets/changes.md
-              AERMAP_VERSION="${{ needs.check-for-new-versions.outputs.aermap_current_version }}"
-            fi
+          FINAL_AERMOD_VERSION="${{ needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
+          FINAL_AERMET_VERSION="${{ needs.check-for-new-versions.outputs.aermet_new_version || needs.check-for-new-versions.outputs.aermet_current_version }}"
+          FINAL_AERMAP_VERSION="${{ needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}"
+
+          echo "  - AERMOD: $FINAL_AERMOD_VERSION" >> release_assets/changes.md
+          echo "  - AERMET: $FINAL_AERMET_VERSION" >> release_assets/changes.md
+          echo "  - AERMAP: $FINAL_AERMAP_VERSION" >> release_assets/changes.md
+          
+          if [ "$FINAL_AERMOD_VERSION" == "$FINAL_AERMET_VERSION" ] && [ "$FINAL_AERMET_VERSION" == "$FINAL_AERMAP_VERSION" ]; then
+            SUITE_VERSION="$FINAL_AERMOD_VERSION"
           else
-            # Use standard versions from version check
-            if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
-              echo "  - AERMOD: ${{ needs.check-for-new-versions.outputs.aermod_new_version }}" >> release_assets/changes.md
-              AERMOD_VERSION="${{ needs.check-for-new-versions.outputs.aermod_new_version }}"
-            else
-              echo "  - AERMOD: ${{ needs.check-for-new-versions.outputs.aermod_current_version }}" >> release_assets/changes.md
-              AERMOD_VERSION="${{ needs.check-for-new-versions.outputs.aermod_current_version }}"
-            fi
-            
-            if [ "${{ needs.check-for-new-versions.outputs.aermet_update_needed }}" == "true" ]; then
-              echo "  - AERMET: ${{ needs.check-for-new-versions.outputs.aermet_new_version }}" >> release_assets/changes.md
-              AERMET_VERSION="${{ needs.check-for-new-versions.outputs.aermet_new_version }}"
-            else
-              echo "  - AERMET: ${{ needs.check-for-new-versions.outputs.aermet_current_version }}" >> release_assets/changes.md
-              AERMET_VERSION="${{ needs.check-for-new-versions.outputs.aermet_current_version }}"
-            fi
-            
-            if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ]; then
-              echo "  - AERMAP: ${{ needs.check-for-new-versions.outputs.aermap_new_version }}" >> release_assets/changes.md
-              AERMAP_VERSION="${{ needs.check-for-new-versions.outputs.aermap_new_version }}"
-            else
-              echo "  - AERMAP: ${{ needs.check-for-new-versions.outputs.aermap_current_version }}" >> release_assets/changes.md
-              AERMAP_VERSION="${{ needs.check-for-new-versions.outputs.aermap_current_version }}"
-            fi
+            SUITE_VERSION="${FINAL_AERMOD_VERSION}-${FINAL_AERMET_VERSION}-${FINAL_AERMAP_VERSION}"
           fi
+          echo "  - AERMOD-Suite: $SUITE_VERSION (formula version)" >> release_assets/changes.md
           
-          # Get the suite version
-          if [ "$AERMOD_VERSION" == "$AERMET_VERSION" ] && [ "$AERMET_VERSION" == "$AERMAP_VERSION" ]; then
-            SUITE_VERSION="$AERMOD_VERSION"
-          else
-            SUITE_VERSION="${AERMOD_VERSION}-${AERMET_VERSION}-${AERMAP_VERSION}"
-          fi
+          echo "has_updates=$has_packaged_assets" >> $GITHUB_OUTPUT
           
-          echo "  - AERMOD-Suite: $SUITE_VERSION (combined version)" >> release_assets/changes.md
-          
-          # Output has_updates based on component updates
-          echo "has_updates=$has_updates" >> $GITHUB_OUTPUT
-          
-          # List all files in release_assets for debugging
           echo "Files prepared for release:"
-          ls -la release_assets/
-          
+          ls -la release_assets
+
       # Check if a release with this tag already exists
       - name: Check for existing release
         id: check-release
@@ -719,10 +645,7 @@ jobs:
           tag_name: v${{ steps.prepare-assets.outputs.tag_date }}
           name: AERMOD Suite Update - ${{ steps.prepare-assets.outputs.tag_date }}
           body_path: release_assets/changes.md
-          files: |
-            release_assets/*.zip
-            release_assets/*.sha256
-            release_assets/README.md
+          files: release_assets/*
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
