@@ -1,3 +1,4 @@
+
 name: CI
 
 permissions:
@@ -14,188 +15,138 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Setup Homebrew on Linux
-        if: runner.os == 'Linux'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Homebrew (official)
         uses: Homebrew/actions/setup-homebrew@master
 
       - name: Update Homebrew
         run: brew update
 
-      - name: Add tap
+      - name: Tap the repository
         run: |
-          brew tap liamswan/homebrew-aermod https://github.com/liamswan/homebrew-aermod
-          brew tap-info liamswan/homebrew-aermod
+          brew tap liamswan/aermod https://github.com/liamswan/homebrew-aermod
 
-      # Configure local tap for development
       - name: Link local repo to tap
+        if: runner.os == 'macOS' || runner.os == 'Linux'
         run: |
-          TAPDIR="$(brew --repository)/Library/Taps/liamswan/homebrew-aermod"
+          TAPDIR="$(brew --repository)/Library/Taps/liamswan/aermod"
           rm -rf "$TAPDIR"
-          mkdir -p "$(dirname $TAPDIR)"
+          mkdir -p "$(dirname "$TAPDIR")"
           ln -s "$(pwd)" "$TAPDIR"
           echo "Tap directory: $TAPDIR"
           ls -la "$TAPDIR"
-          
-      # Continue with the rest of the workflow
+
       - name: Brew audit
         run: |
-          # Create a list of formulas
           formulas=(Formula/*.rb)
-          echo "Found ${#formulas[@]} formulas to audit"
-          
+          echo "Found \${#formulas[@]} formulas to audit"
           any_failures=0
           failed_formulas=()
-          
-          for f in "${formulas[@]}"; do
-            formula_name="$(basename "$f" .rb)"
-            echo "Starting audit for liamswan/homebrew-aermod/$formula_name"
-            
-            # Run audit and capture output
-            if ! brew audit --strict "liamswan/homebrew-aermod/$formula_name" > "audit_${formula_name}.log" 2>&1; then
-              echo "Error: Audit failed for $formula_name"
-              echo "Contents of audit_${formula_name}.log:"
-              cat "audit_${formula_name}.log"
+
+          for f in "\${formulas[@]}"; do
+            formula_name="\$(basename "\$f" .rb)"
+            echo "Starting audit for formula: \$formula_name"
+            if ! brew audit --strict "\$formula_name"; then
+              echo "Error: Audit failed for \$formula_name"
               any_failures=1
-              failed_formulas+=("$formula_name")
+              failed_formulas+=("\$formula_name")
             else
-              echo "Audit passed for $formula_name"
+              echo "Audit passed for \$formula_name"
             fi
           done
-          
-          # Summarize all failures at the end
-          if [ $any_failures -ne 0 ]; then
+
+          if [ \$any_failures -ne 0 ]; then
             echo "========== AUDIT FAILURES =========="
-            for failure in "${failed_formulas[@]}"; do
-              echo "- $failure"
+            for failure in "\${failed_formulas[@]}"; do
+              echo "- \$failure"
             done
-            echo "=================================="
-            echo "One or more audits failed. Please fix the style issues reported above."
+            echo "====================================="
             exit 1
           fi
-          
+
       - name: Brew style
         run: |
-          # Create a list of formulas
           formulas=(Formula/*.rb)
-          echo "Found ${#formulas[@]} formulas to style check"
-          
+          echo "Found \${#formulas[@]} formulas to style check"
           any_failures=0
           failed_formulas=()
-          
-          for f in "${formulas[@]}"; do
-            formula_name="$(basename "$f" .rb)"
-            echo "Starting style check for liamswan/homebrew-aermod/$formula_name"
-            
-            # Run style check and fix if possible
-            if ! brew style --fix "liamswan/homebrew-aermod/$formula_name" > "style_${formula_name}.log" 2>&1; then
-              echo "Warning: Style issues found for $formula_name that couldn't be automatically fixed"
-              echo "Contents of style_${formula_name}.log:"
-              cat "style_${formula_name}.log"
+
+          for f in "\${formulas[@]}"; do
+            formula_name="\$(basename "\$f" .rb)"
+            echo "Starting style check for formula: \$formula_name"
+            if ! brew style --fix "\$formula_name"; then
+              echo "Warning: Style issues found for \$formula_name"
               any_failures=1
-              failed_formulas+=("$formula_name")
+              failed_formulas+=("\$formula_name")
             else
-              echo "Style check passed for $formula_name"
+              echo "Style check passed for \$formula_name"
             fi
           done
-          
-          # Check if any files were modified by brew style --fix
+
           if git diff --quiet -- Formula/; then
             echo "No style fixes were applied"
           else
-            echo "Style fixes were applied. Changes:"
-            git diff -- Formula/
+            echo "Style fixes were applied. Changes below:"
+            git --no-pager diff -- Formula/
           fi
-          
-          # Summarize all failures at the end
-          if [ $any_failures -ne 0 ]; then
+
+          if [ \$any_failures -ne 0 ]; then
             echo "========== STYLE CHECK FAILURES =========="
-            for failure in "${failed_formulas[@]}"; do
-              echo "- $failure"
+            for failure in "\${failed_formulas[@]}"; do
+              echo "- \$failure"
             done
             echo "========================================"
-            echo "One or more style checks failed. Please review the issues reported above."
-            # Don't exit with error for style issues, as we've tried to fix them automatically
+            echo "Some style issues could not be automatically fixed."
           fi
 
       - name: Install formulas
         run: |
-          # Array to track failures
           failed_formulas=()
-          
-          echo "Installing dependencies..."
+          echo "Installing dependencies and formulas"
+
           for f in Formula/*.rb; do
-            formula_name="$(basename "$f" .rb)"
-            
-            # Skip versioned formulas that match the current version of the main formula
-            if [[ "$formula_name" =~ ^(aermod|aermet|aermap)@([0-9]+)$ ]]; then
-              base_formula="${BASH_REMATCH[1]}"
-              version="${BASH_REMATCH[2]}"
-              main_version=$(grep -o 'version "[0-9]*"' "Formula/${base_formula}.rb" | grep -o '[0-9]*')
-              
-              if [[ "$version" == "$main_version" ]]; then
-                echo "Skipping versioned formula $formula_name (same as current $base_formula version)"
-                continue
-              fi
-            fi
-            
-            echo "Installing dependencies for $formula_name"
-            if ! brew install --build-from-source --only-dependencies "$f"; then
-              echo "Warning: Failed to install dependencies for $formula_name"
-              failed_formulas+=("$formula_name (dependencies)")
+            formula_name="\$(basename "\$f" .rb)"
+            echo "Installing dependencies for \$formula_name"
+            if ! brew install --build-from-source --only-dependencies "\$formula_name"; then
+              echo "Warning: Failed to install dependencies for \$formula_name"
+              failed_formulas+=("\$formula_name (dependencies)")
             fi
           done
-          
-          # Install the suite formula first to avoid duplicate component installation
+
           if [ -f "Formula/aermod-suite.rb" ]; then
             echo "Installing aermod-suite..."
-            if ! brew install --build-from-source "Formula/aermod-suite.rb"; then
+            if ! brew install --build-from-source aermod-suite; then
               echo "Warning: Failed to install aermod-suite"
               failed_formulas+=("aermod-suite (installation)")
             fi
           fi
-          
-          # Install any remaining formulas that aren't part of the suite
+
           for f in Formula/*.rb; do
-            formula_name="$(basename "$f" .rb)"
-            
-            # Skip suite formula as it's already installed
-            if [[ "$formula_name" == "aermod-suite" ]]; then
+            formula_name="\$(basename "\$f" .rb)"
+            if [ "\$formula_name" = "aermod-suite" ]; then
               continue
             fi
-            
-            # Skip versioned formulas that match the current version of the main formula
-            if [[ "$formula_name" =~ ^(aermod|aermet|aermap)@([0-9]+)$ ]]; then
-              base_formula="${BASH_REMATCH[1]}"
-              version="${BASH_REMATCH[2]}"
-              main_version=$(grep -o 'version "[0-9]*"' "Formula/${base_formula}.rb" | grep -o '[0-9]*')
-              
-              if [[ "$version" == "$main_version" ]]; then
-                echo "Skipping versioned formula $formula_name (same as current $base_formula version)"
+            if brew list aermod-suite &>/dev/null; then
+              if [[ "\$formula_name" =~ ^(aermap|aermet|aermod)\$ ]]; then
+                echo "Skipping \$formula_name (installed by aermod-suite)"
                 continue
               fi
             fi
-            
-            # Check if the formula is a dependency of aermod-suite
-            if grep -q "depends_on \"$formula_name\"" Formula/aermod-suite.rb; then
-              echo "Skipping $formula_name (already installed via aermod-suite)"
-              continue
-            elif [[ "$formula_name" =~ ^(aermod|aermet|aermap)$ ]] && ! brew list "$formula_name" &>/dev/null; then
-              echo "Installing $formula_name"
-              if ! brew install --build-from-source "$f"; then
-                echo "Warning: Failed to install $formula_name"
-                failed_formulas+=("$formula_name (installation)")
-              fi
+            echo "Installing \$formula_name"
+            if ! brew install --build-from-source "\$formula_name"; then
+              echo "Warning: Failed to install \$formula_name"
+              failed_formulas+=("\$formula_name (installation)")
             fi
           done
-          
-          # Report failures
-          if [ ${#failed_formulas[@]} -gt 0 ]; then
+
+          if [ \${#failed_formulas[@]} -gt 0 ]; then
             echo "========== INSTALLATION FAILURES =========="
-            for failure in "${failed_formulas[@]}"; do
-              echo "- $failure"
+            for failure in "\${failed_formulas[@]}"; do
+              echo "- \$failure"
             done
             echo "==========================================="
             exit 1
@@ -203,78 +154,47 @@ jobs:
 
       - name: Run tests
         run: |
-          # Array to track test failures
           failed_tests=()
-          
-          # First test the suite if it's installed
+
           if brew list aermod-suite &>/dev/null; then
             echo "Testing AERMOD Suite components..."
-            
-            # Check that the executables are installed and in PATH
             for component in aermod aermet aermap; do
-              if ! which $component > /dev/null; then
-                echo "Error: $component executable not found in PATH"
-                failed_tests+=("aermod-suite ($component missing)")
+              if ! which "\$component" &>/dev/null; then
+                echo "Error: \$component executable not found in PATH"
+                failed_tests+=("aermod-suite (\$component missing)")
               else
-                echo "✓ $component executable found"
-                
-                # Verify component version matches what's expected
-                version_output=$($component 2>&1 | grep -i version || echo "Version not found")
-                echo "  $component version info: $version_output"
+                echo "✓ Found \$component"
+                version_output="\$("\$component" 2>&1 | grep -i version || echo "Version not found")"
+                echo "  \$component version: \$version_output"
               fi
             done
-            
-            # Mark component formulas as already tested via the suite
             tested_via_suite=(aermod aermet aermap)
           else
             tested_via_suite=()
           fi
-          
-          # Test remaining formulas
+
           for f in Formula/*.rb; do
-            formula_name="$(basename "$f" .rb)"
-            
-            # Skip testing components already tested via suite
-            if [[ " ${tested_via_suite[*]} " =~ " ${formula_name} " ]]; then
-              echo "Skipping test for $formula_name (already tested via aermod-suite)"
+            formula_name="\$(basename "\$f" .rb)"
+            if [[ " \${tested_via_suite[*]} " =~ " \$formula_name " ]]; then
+              echo "Skipping test for \$formula_name (covered by suite)"
               continue
             fi
-            
-            # Skip testing versioned formulas that match the current version
-            if [[ "$formula_name" =~ ^(aermod|aermet|aermap)@([0-9]+)$ ]]; then
-              base_formula="${BASH_REMATCH[1]}"
-              version="${BASH_REMATCH[2]}"
-              main_version=$(grep -o 'version "[0-9]*"' "Formula/${base_formula}.rb" | grep -o '[0-9]*')
-              
-              if [[ "$version" == "$main_version" ]]; then
-                echo "Skipping test for versioned formula $formula_name (same as current $base_formula version)"
-                continue
-              fi
-            fi
-            
-            # Skip aermod-suite (already tested above)
-            if [[ "$formula_name" == "aermod-suite" ]]; then
-              continue
-            fi
-            
-            # Only test formulas that are installed
-            if brew list "$formula_name" &>/dev/null; then
-              echo "Testing $formula_name"
-              if ! brew test "$formula_name"; then
-                echo "Warning: Test failed for $formula_name"
-                failed_tests+=("$formula_name")
+            if brew list "\$formula_name" &>/dev/null; then
+              echo "Testing \$formula_name"
+              if ! brew test "\$formula_name"; then
+                echo "Warning: Test failed for \$formula_name"
+                failed_tests+=("\$formula_name")
               fi
             else
-              echo "Skipping test for $formula_name (not installed)"
+              echo "Skipping test for \$formula_name (not installed)"
             fi
           done
-          
-          # Report test failures
-          if [ ${#failed_tests[@]} -gt 0 ]; then
+
+          if [ \${#failed_tests[@]} -gt 0 ]; then
             echo "========== TEST FAILURES =========="
-            for failure in "${failed_tests[@]}"; do
-              echo "- $failure"
+            for failure in "\${failed_tests[@]}"; do
+              echo "- \$failure"
             done
-            echo "=================================="
+            echo "==================================="
             exit 1
           fi
