@@ -741,6 +741,10 @@ jobs:
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@master
       
+      - name: Set up Homebrew tap
+        run: |
+          brew tap --force-auto-update liamswan/homebrew-aermod https://github.com/liamswan/homebrew-aermod
+      
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -885,6 +889,10 @@ jobs:
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@master
       
+      - name: Set up Homebrew tap
+        run: |
+          brew tap --force-auto-update liamswan/homebrew-aermod https://github.com/liamswan/homebrew-aermod
+      
       - name: Add tap
         run: |
           brew tap liamswan/homebrew-aermod
@@ -935,6 +943,10 @@ jobs:
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@master
       
+      - name: Set up Homebrew tap
+        run: |
+          brew tap --force-auto-update liamswan/homebrew-aermod https://github.com/liamswan/homebrew-aermod
+      
       - name: Add tap
         run: |
           brew tap liamswan/homebrew-aermod
@@ -984,6 +996,10 @@ jobs:
       - name: Set up Homebrew
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@master
+      
+      - name: Set up Homebrew tap
+        run: |
+          brew tap --force-auto-update liamswan/homebrew-aermod https://github.com/liamswan/homebrew-aermod
       
       - name: Add tap
         run: |
@@ -1036,13 +1052,16 @@ jobs:
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@master
       
+      - name: Set up Homebrew tap
+        run: |
+          brew tap --force-auto-update liamswan/homebrew-aermod https://github.com/liamswan/homebrew-aermod
+      
       - name: Add tap
         run: |
           brew tap liamswan/homebrew-aermod
           brew update # Ensure the tap is up-to-date
       
       - name: Install and test AERMOD Suite
-        continue-on-error: true
         run: |
           echo "Attempting to install AERMOD Suite..."
           if brew install aermod-suite; then
