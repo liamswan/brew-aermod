@@ -7,7 +7,7 @@ class AermodSuite < Formula
   # It points to the correct repository 'homebrew-aermod'.
   # The tag (v00000000) and filename (aermod-suite-0000.tar.gz) are placeholders.
   url "https://github.com/liamswan/homebrew-aermod/releases/download/v20250601/aermod-suite-24142.tar.gz"
-  sha256 "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  sha256 "85cea451eec057fa7e734548ca3ba6d779ed5836a3f9de14b8394575ef0d7d8e"
   license :public_domain # SHA256 for an empty tarball
 
   depends_on "aermap"
