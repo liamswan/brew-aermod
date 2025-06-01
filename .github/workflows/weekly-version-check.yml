@@ -412,98 +412,82 @@ jobs:
       - name: Update aermod-suite formula
         run: |
           TAG_DATE=$(date +%Y%m%d)
-          CURRENT_YEAR=$(date +%Y)
-          SUITE_TARBALL_NAME="aermod-suite-${CURRENT_YEAR}.tar.gz"
-          
+          CURRENT_YEAR=$(date +'%Y') # Define CURRENT_YEAR
+
           # Get the latest version of each component
           AERMOD_VERSION="${{ needs.check-for-new-versions.outputs.aermod_update_needed == 'true' && needs.check-for-new-versions.outputs.aermod_new_version || needs.check-for-new-versions.outputs.aermod_current_version }}"
           AERMET_VERSION="${{ needs.check-for-new-versions.outputs.aermet_update_needed == 'true' && needs.check-for-new-versions.outputs.aermet_new_version || needs.check-for-new-versions.outputs.aermet_current_version }}"
           AERMAP_VERSION="${{ needs.check-for-new-versions.outputs.aermap_update_needed == 'true' && needs.check-for-new-versions.outputs.aermap_new_version || needs.check-for-new-versions.outputs.aermap_current_version }}"
-          
+
           # Create a combined version string for the suite
           if [ "$AERMOD_VERSION" == "$AERMET_VERSION" ] && [ "$AERMET_VERSION" == "$AERMAP_VERSION" ]; then
-            SUITE_VERSION="$AERMOD_VERSION" # Ensure SUITE_VERSION is assigned
+            SUITE_VERSION="$AERMOD_VERSION"
             echo "All components have the same version: $SUITE_VERSION"
           else
-            SUITE_VERSION="${AERMOD_VERSION}-${AERMET_VERSION}-${AERMAP_VERSION}" # Ensure SUITE_VERSION is assigned
+            SUITE_VERSION="${AERMOD_VERSION}-${AERMET_VERSION}-${AERMAP_VERSION}"
             echo "Using combined version string: $SUITE_VERSION"
           fi
-          
+
+          if [ -z "$SUITE_VERSION" ]; then
+            echo "Error: SUITE_VERSION is empty. Cannot update formula."
+            exit 1
+          fi
+
+          SUITE_TARBALL_NAME="aermod-suite-${SUITE_VERSION}.tar.gz"
+          NEW_URL="https://github.com/liamswan/homebrew-aermod/releases/download/v${CURRENT_YEAR}${TAG_DATE}/${SUITE_TARBALL_NAME}"
+
+          echo "Updating Formula/aermod-suite.rb with SUITE_VERSION: $SUITE_VERSION and NEW_URL: $NEW_URL"
+
           # Update version in aermod-suite.rb
+          # Handle both simple numeric and compound versions
           sed -i "s/version \\"[0-9A-Za-z-]*\\"/version \\"$SUITE_VERSION\\"/" Formula/aermod-suite.rb
           
           # Update URL in aermod-suite.rb
-          NEW_URL="https://github.com/${{ github.repository }}/releases/download/v$TAG_DATE/$SUITE_TARBALL_NAME"
-          # Use a more robust sed pattern to match the full URL line, allowing for different protocols and structures
-          sed -i "s|^  url \\".*\\"|  url \\"$NEW_URL\\"|" Formula/aermod-suite.rb
-          # Ensure the sha256 for the empty tarball is correctly set if it was changed
-          sed -i "s|^  sha256 \\".*\\"|  sha256 \\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\\"|" Formula/aermod-suite.rb
+          # Ensure the pattern matches the placeholder URL correctly
+          sed -i "s|^  url \\"https://github.com/liamswan/homebrew-aermod/releases/download/v[0-9]*/aermod-suite-[0-9]*.tar.gz\\"|  url \\"$NEW_URL\\"|" Formula/aermod-suite.rb
           
           # Update dependencies to use the latest versions
-          if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
-            sed -i "s/depends_on \"aermod@[0-9]*\"/depends_on \"aermod@$AERMOD_VERSION\"/" Formula/aermod-suite.rb
+          # Ensure these sed commands correctly target existing dependency lines, whether versioned or not.
+          # If aermod was updated, update its dependency
+          if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ] || [ "${{ github.event.inputs.force_run }}" == "true" ]; then
+            # Try updating if versioned, then if not versioned
+            if grep -q "depends_on \\"aermod@[0-9]*\\"" Formula/aermod-suite.rb; then
+              sed -i "s/depends_on \\"aermod@[0-9]*\\"/depends_on \\"aermod@$AERMOD_VERSION\\"/" Formula/aermod-suite.rb
+            elif grep -q "depends_on \\"aermod\\"" Formula/aermod-suite.rb; then
+              sed -i "s/depends_on \\"aermod\\"/depends_on \\"aermod@$AERMOD_VERSION\\"/" Formula/aermod-suite.rb
+            else
+              echo "No existing aermod dependency found to update in aermod-suite.rb"
+            fi
           fi
-          
-          if [ "${{ needs.check-for-new-versions.outputs.aermet_update_needed }}" == "true" ]; then
-            sed -i "s/depends_on \"aermet@[0-9]*\"/depends_on \"aermet@$AERMET_VERSION\"/" Formula/aermod-suite.rb
+
+          if [ "${{ needs.check-for-new-versions.outputs.aermet_update_needed }}" == "true" ] || [ "${{ github.event.inputs.force_run }}" == "true" ]; then
+            if grep -q "depends_on \\"aermet@[0-9]*\\"" Formula/aermod-suite.rb; then
+              sed -i "s/depends_on \\"aermet@[0-9]*\\"/depends_on \\"aermet@$AERMET_VERSION\\"/" Formula/aermod-suite.rb
+            elif grep -q "depends_on \\"aermet\\"" Formula/aermod-suite.rb; then
+              sed -i "s/depends_on \\"aermet\\"/depends_on \\"aermet@$AERMET_VERSION\\"/" Formula/aermod-suite.rb
+            else
+              echo "No existing aermet dependency found to update in aermod-suite.rb"
+            fi
           fi
-          
-          if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ]; then
-            sed -i "s/depends_on \"aermap@[0-9]*\"/depends_on \"aermap@$AERMAP_VERSION\"/" Formula/aermod-suite.rb
+
+          if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ] || [ "${{ github.event.inputs.force_run }}" == "true" ]; then
+            if grep -q "depends_on \\"aermap@[0-9]*\\"" Formula/aermod-suite.rb; then
+              sed -i "s/depends_on \\"aermap@[0-9]*\\"/depends_on \\"aermap@$AERMAP_VERSION\\"/" Formula/aermod-suite.rb
+            elif grep -q "depends_on \\"aermap\\"" Formula/aermod-suite.rb; then
+              sed -i "s/depends_on \\"aermap\\"/depends_on \\"aermap@$AERMAP_VERSION\\"/" Formula/aermod-suite.rb
+            else
+              echo "No existing aermap dependency found to update in aermod-suite.rb"
+            fi
           fi
           
           # Add a comment to the formula indicating the component versions
           COMPONENT_VERSIONS="# AERMOD Suite with components: AERMOD $AERMOD_VERSION, AERMET $AERMET_VERSION, AERMAP $AERMAP_VERSION"
           if grep -q "# AERMOD Suite with components:" Formula/aermod-suite.rb; then
-            sed -i "s/# AERMOD Suite with components:.*/$COMPONENT_VERSIONS/" Formula/aermod-suite.rb
+            sed -i "s|# AERMOD Suite with components:.*|$COMPONENT_VERSIONS|" Formula/aermod-suite.rb
           else
             # Insert after the class declaration
-            sed -i "/class AermodSuite < Formula/a\\  $COMPONENT_VERSIONS" Formula/aermod-suite.rb
+            sed -i "/class AermodSuite < Formula/a\\\\  $COMPONENT_VERSIONS" Formula/aermod-suite.rb
           fi
-      
-      - name: Check for changes to commit
-        id: check_commit_changes
-        run: |
-          # Add all potentially changed files first
-          git add downloads/ checksums/ Formula/
-          # Check if there are changes staged for commit
-          if git diff --staged --quiet; then
-            echo "no_changes_to_commit=true" >> $GITHUB_OUTPUT
-            echo "No changes to commit."
-          else
-            echo "no_changes_to_commit=false" >> $GITHUB_OUTPUT
-            echo "Changes detected, will commit."
-          fi
-      
-      # Commit all changes
-      - name: Commit and push changes
-        if: steps.check_commit_changes.outputs.no_changes_to_commit != 'true'
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          
-          # Files are already added in the check_commit_changes step and README update step
-          
-          # Create commit message based on what was updated
-          COMMIT_MSG="Update AERMOD Suite components [automated]:"
-          
-          if [ "${{ needs.check-for-new-versions.outputs.aermod_update_needed }}" == "true" ]; then
-            COMMIT_MSG="$COMMIT_MSG AERMOD ${{ needs.check-for-new-versions.outputs.aermod_new_version }}"
-          fi
-          
-          if [ "${{ needs.check-for-new-versions.outputs.aermet_update_needed }}" == "true" ]; then
-            COMMIT_MSG="$COMMIT_MSG AERMET ${{ needs.check-for-new-versions.outputs.aermet_new_version }}"
-          fi
-          
-          if [ "${{ needs.check-for-new-versions.outputs.aermap_update_needed }}" == "true" ]; then
-            COMMIT_MSG="$COMMIT_MSG AERMAP ${{ needs.check-for-new-versions.outputs.aermap_new_version }}"
-          fi
-          
-          # Add note about README update
-          COMMIT_MSG="$COMMIT_MSG (README updated)"
-          
-          git commit -m "$COMMIT_MSG"
-          git push
       
       # Prepare release assets
       - name: Prepare release assets
@@ -517,13 +501,8 @@ jobs:
           echo "" >> release_assets/changes.md
           
           TAG_DATE=$(date +%Y%m%d)
-          CURRENT_YEAR=$(date +%Y)
-          SUITE_TARBALL_NAME="aermod-suite-${CURRENT_YEAR}.tar.gz"
+          CURRENT_YEAR=$(date +'%Y') # Define CURRENT_YEAR
           echo "tag_date=$TAG_DATE" >> $GITHUB_OUTPUT
-          
-          # Create empty tarball for aermod-suite
-          tar czf "release_assets/$SUITE_TARBALL_NAME" --files-from /dev/null
-          echo "Created empty tarball: release_assets/$SUITE_TARBALL_NAME"
           
           # Copy the updated README for release assets
           cp README.md release_assets/README.md
@@ -614,6 +593,19 @@ jobs:
             SUITE_VERSION="${FINAL_AERMOD_VERSION}-${FINAL_AERMET_VERSION}-${FINAL_AERMAP_VERSION}"
           fi
           echo "  - AERMOD-Suite: $SUITE_VERSION (formula version)" >> release_assets/changes.md
+
+          # Create the empty tarball for aermod-suite
+          if [ -n "$SUITE_VERSION" ]; then
+            SUITE_TARBALL_NAME="aermod-suite-${SUITE_VERSION}.tar.gz"
+            echo "Creating empty tarball: release_assets/$SUITE_TARBALL_NAME"
+            tar czf "release_assets/$SUITE_TARBALL_NAME" --files-from /dev/null
+            # Ensure this asset is included in the release if it's created
+            if [ -f "release_assets/$SUITE_TARBALL_NAME" ]; then
+              has_packaged_assets=true # Assuming this variable is used to decide if release happens
+            fi
+          else
+            echo "Warning: SUITE_VERSION is empty, cannot create suite tarball."
+          fi
           
           echo "has_updates=$has_packaged_assets" >> $GITHUB_OUTPUT
           
@@ -1076,24 +1068,29 @@ jobs:
       
       - name: Install and test AERMOD Suite
         run: |
-          echo "Attempting to install AERMOD Suite..."
-          if brew install aermod-suite; then
-            echo "AERMOD Suite installed successfully."
+          # Ensure the tap is correctly set up before testing
+          brew update > /dev/null # Suppress verbose output unless debugging
+          brew doctor || true # Run doctor but don't fail the job if it has warnings
+          
+          echo "Attempting to install aermod-suite..."
+          if brew install --verbose --debug liamswan/homebrew-aermod/aermod-suite; then
+            echo "aermod-suite installed successfully."
           else
-            echo "Failed to install AERMOD Suite."
+            echo "Failed to install aermod-suite."
+            # Attempt to gather more info if install fails
+            echo "--- Formula Info ---"
+            brew info liamswan/homebrew-aermod/aermod-suite
+            echo "--- Trying to fetch formula directly ---"
+            brew fetch --force liamswan/homebrew-aermod/aermod-suite || echo "Fetch also failed"
             exit 1
           fi
-          echo "Attempting to test AERMOD Suite..."
-          if brew test aermod-suite; then
-            echo "AERMOD Suite tested successfully."
+          
+          echo "Testing aermod-suite..."
+          if brew test liamswan/homebrew-aermod/aermod-suite; then
+            echo "aermod-suite tests passed."
           else
-            echo "Failed to test AERMOD Suite."
-          fi
-          echo "Checking linkage for AERMOD Suite..."
-          if brew linkage --test aermod-suite; then
-            echo "AERMOD Suite linkage check passed."
-          else
-            echo "AERMOD Suite linkage check failed."
+            echo "Failed to test aermod-suite."
+            exit 1
           fi
 
       # Create success comment
