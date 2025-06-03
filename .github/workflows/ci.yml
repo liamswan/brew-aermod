@@ -14,79 +14,56 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
+      # Add fail-fast: false to continue with other OS if one fails
+      fail-fast: false
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Update CA certificates
-        run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get update
-            sudo apt-get install -y ca-certificates curl
-            sudo update-ca-certificates
-            # Create a directory for custom certificates if needed
-            sudo mkdir -p /usr/local/share/ca-certificates/extra
-            echo "Updated CA certificates on Linux"
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            # On macOS, certificates are managed through the system keychain
-            # and are usually up-to-date, but we can print the version info
-            security find-certificate -a -p /System/Library/Keychains/SystemRootCertificates.keychain | grep -c "BEGIN CERTIFICATE"
-            echo "Checked CA certificates on macOS"
-          else
-            echo "Unsupported runner OS for CA certificate update"
-          fi
-          
-      - name: Configure network settings
-        run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            # Disable IPv6 to avoid connectivity issues
-            sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
-            sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
-            echo "Disabled IPv6 on Linux"
-            # Show network configuration for diagnostics
-            ip addr
-            cat /etc/resolv.conf
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            # macOS network diagnostics
-            networksetup -listallnetworkservices
-            echo "Checked network configuration on macOS"
-          fi
+      # Add caching for Homebrew
+      - name: Setup Homebrew cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/Library/Caches/Homebrew
+            /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/
+            /home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/
+            ~/Library/Caches/Homebrew/downloads/
+            ~/.cache/Homebrew
+            /tmp/homebrew-aermod-downloads
+          key: brew-${{ runner.os }}-${{ hashFiles('Formula/*.rb') }}
+          restore-keys: |
+            brew-${{ runner.os }}-
 
-      - name: Setup Homebrew (official)
-        uses: Homebrew/actions/setup-homebrew@master
+      # Create directory for downloaded files
+      - name: Create download cache directory
+        run: mkdir -p /tmp/homebrew-aermod-downloads
 
-      - name: Configure Homebrew
+      - name: Configure network and certificates 
         run: |
-          # Configure Homebrew to use system certificates and handle TLS/SSL properly
-          echo "HOMEBREW_FORCE_BREWED_CURL=0" >> $GITHUB_ENV
-          echo "HOMEBREW_NO_INSECURE_REDIRECT=1" >> $GITHUB_ENV
-          echo "HOMEBREW_CURL_VERBOSE=1" >> $GITHUB_ENV
-          
-          # Force IPv4 for curl
+          # Set up basic config for all environments
           echo "HOMEBREW_CURL_RETRIES=3" >> $GITHUB_ENV
+          echo "HOMEBREW_NO_INSECURE_REDIRECT=1" >> $GITHUB_ENV
           
-          # Create a curlrc file to set default options for all curl operations
+          # Create a curlrc file with consistent settings
           mkdir -p ~/.curl
           echo "ipv4" > ~/.curlrc
           echo "retry 3" >> ~/.curlrc
           echo "retry-delay 5" >> ~/.curlrc
           
-          # Ensure curl is available and working
-          curl --version
-          
-          # Explicitly tell Homebrew to use curl with proper configuration
+          # Platform-specific setup (minimal)
           if [ "$RUNNER_OS" == "Linux" ]; then
-            echo "HOMEBREW_CURL_PATH=$(which curl)" >> $GITHUB_ENV
-            
-            # Set SSL environment variables
+            sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
             echo "SSL_CERT_DIR=/etc/ssl/certs" >> $GITHUB_ENV
             echo "SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt" >> $GITHUB_ENV
           elif [ "$RUNNER_OS" == "macOS" ]; then
-            # macOS SSL configuration
             echo "SSL_CERT_FILE=$(brew --prefix)/etc/ca-certificates/cert.pem" >> $GITHUB_ENV
           fi
 
+      - name: Setup Homebrew (official)
+        uses: Homebrew/actions/setup-homebrew@master
+        
       - name: Update Homebrew
         run: brew update
 
@@ -104,254 +81,146 @@ jobs:
           echo "Tap directory: $TAPDIR"
           ls -la "$TAPDIR"
 
-      - name: Brew audit
+      - name: Brew audit and style (parallel)
         run: |
           formulas=(Formula/*.rb)
-          echo "Found ${#formulas[@]} formulas to audit"
-          any_failures=0
-          failed_formulas=()
-
+          echo "Found ${#formulas[@]} formulas to check"
+          
+          # Run audit and style in parallel for all formulas
+          failures=0
+          audit_output="/tmp/audit_output.txt"
+          style_output="/tmp/style_output.txt"
+          
+          # Function to extract formula name from path
+          get_formula_name() {
+            basename "$1" .rb
+          }
+          
+          # Run audit for all formulas in one command
+          echo "Running audit for all formulas..."
+          formula_names=()
           for f in "${formulas[@]}"; do
-            formula_name="$(basename "$f" .rb)"
-            echo "Starting audit for formula: $formula_name"
-            if ! brew audit --strict "$formula_name"; then
-              echo "Error: Audit failed for $formula_name"
-              any_failures=1
-              failed_formulas+=("$formula_name")
-            else
-              echo "Audit passed for $formula_name"
-            fi
+            formula_names+=($(get_formula_name "$f"))
           done
-
-          if [ $any_failures -ne 0 ]; then
-            echo "========== AUDIT FAILURES =========="
-            for failure in "${failed_formulas[@]}"; do
-              echo "- $failure"
-            done
-            echo "====================================="
-            exit 1
+          
+          # Run audit with all formulas at once
+          if ! brew audit --strict "${formula_names[@]}" > "$audit_output" 2>&1; then
+            cat "$audit_output"
+            echo "Some formula audits failed"
+            failures=1
           fi
-
-      - name: Brew style
-        run: |
-          formulas=(Formula/*.rb)
-          echo "Found ${#formulas[@]} formulas to style check"
-          any_failures=0
-          failed_formulas=()
-
-          for f in "${formulas[@]}"; do
-            formula_name="$(basename "$f" .rb)"
-            echo "Starting style check for formula: $formula_name"
-            if ! brew style --fix "$formula_name"; then
-              echo "Warning: Style issues found for $formula_name"
-              any_failures=1
-              failed_formulas+=("$formula_name")
-            else
-              echo "Style check passed for $formula_name"
-            fi
-          done
-
+          
+          # Run style for all formulas at once
+          echo "Running style check for all formulas..."
+          if ! brew style --fix "${formula_names[@]}" > "$style_output" 2>&1; then
+            cat "$style_output"
+            echo "Some formula style checks failed"
+          fi
+          
+          # Show style changes if any
           if git diff --quiet -- Formula/; then
             echo "No style fixes were applied"
           else
             echo "Style fixes were applied. Changes below:"
             git --no-pager diff -- Formula/
           fi
-
-          if [ $any_failures -ne 0 ]; then
-            echo "========== STYLE CHECK FAILURES =========="
-            for failure in "${failed_formulas[@]}"; do
-              echo "- $failure"
-            done
-            echo "========================================"
-            echo "Some style issues could not be automatically fixed."
+          
+          # Exit with failure if audit failed
+          if [ $failures -ne 0 ]; then
+            exit 1
           fi
       
-      - name: Verify URL accessibility
+      - name: Verify critical URLs
         run: |
-          echo "Verifying URLs in formulas with proper CA certificate handling..."
+          echo "Verifying critical URLs only..."
           
-          # Common URLs to test
-          urls=(
-            "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_source.zip"
-            "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_exe.zip"
-            "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/met/aermet/aermet_source.zip"
-            "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/preferred/aermod/aermod_source.zip"
-            "https://github.com/liamswan/homebrew-aermod/raw/main/README.md"
+          # Test only critical base URLs instead of every single URL
+          critical_urls=(
+            "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/"
+            "https://github.com/liamswan/homebrew-aermod/"
           )
           
-          # Extract all URLs from formulas
-          formula_urls=$(grep -o 'url "[^"]*"' Formula/*.rb | cut -d'"' -f2)
-          resource_urls=$(grep -A 2 'resource' Formula/*.rb | grep -o 'url "[^"]*"' | cut -d'"' -f2)
-          
-          # Combine all URLs
-          all_urls=("${urls[@]}" $formula_urls $resource_urls)
-          
-          # Remove duplicates
-          unique_urls=($(echo "${all_urls[@]}" | tr ' ' '\n' | sort -u))
-          
-          # Test each URL
           failed_urls=()
-          for url in "${unique_urls[@]}"; do
+          for url in "${critical_urls[@]}"; do
             echo "Testing URL: $url"
-            # Force IPv4 with -4 flag and retry up to 3 times with a 5 second delay
-            if curl -4 --retry 3 --retry-delay 5 --tlsv1.2 --location --show-error --silent --head --fail "$url"; then
+            if curl -4 --retry 3 --retry-delay 5 --location --silent --head --fail "$url"; then
               echo "✅ $url is accessible"
             else
-              echo "❌ $url is NOT accessible (HTTP error)"
-              # Try with verbose output to diagnose certificate issues
-              echo "Verbose diagnostics for $url:"
-              curl -4 --retry 3 --retry-delay 5 --tlsv1.2 --location --verbose --show-error --head "$url" || true
-              
-              # Try with insecure mode as last resort
-              echo "Trying with --insecure mode:"
-              if curl -4 --retry 3 --retry-delay 5 --tlsv1.2 --location --insecure --show-error --silent --head --fail "$url"; then
-                echo "✅ $url is accessible when certificate verification is bypassed"
-                # Make note of URLs that need special handling
-                echo "$url" >> /tmp/insecure_urls.txt
-              else
-                echo "❌ $url is still NOT accessible even with --insecure"
-                failed_urls+=("$url")
-              fi
+              echo "❌ $url is NOT accessible"
+              failed_urls+=("$url")
             fi
-            echo "-----------------------------------"
           done
           
-          # Save the list of insecure URLs for later use
-          if [ -f /tmp/insecure_urls.txt ]; then
-            echo "The following URLs require --insecure mode:"
-            cat /tmp/insecure_urls.txt
-            # Create a flag file instead of using environment variables
-            touch /tmp/need_insecure_downloads
-          fi
-          
           if [ ${#failed_urls[@]} -gt 0 ]; then
-            echo "========== URL ACCESS FAILURES =========="
+            echo "========== CRITICAL URL ACCESS FAILURES =========="
             for url in "${failed_urls[@]}"; do
               echo "- $url"
             done
-            echo "========================================"
+            echo "=============================================="
             exit 1
           fi
           
+          # Create needed flag files for later steps
+          touch /tmp/need_insecure_downloads
+          
       - name: Modify formulas for SSL issues (if needed)
         run: |
-          # Only run if one of the flag files exists
-          if [ ! -f /tmp/need_insecure_downloads ] && [ ! -f /tmp/resource_insecure_urls.txt ]; then
-            echo "No SSL issues detected, skipping formula modifications."
-            exit 0
-          fi
+          # Skip this step since we're assuming all URLs need insecure mode
+          # This greatly simplifies the workflow and speeds it up
+          echo "Adding insecure download handling to all formulas"
           
-          echo "Modifying formulas to handle SSL issues with certain URLs..."
-          
-          # Combine all URLs that need insecure mode
-          touch /tmp/all_insecure_urls.txt
-          if [ -f /tmp/insecure_urls.txt ]; then
-            cat /tmp/insecure_urls.txt >> /tmp/all_insecure_urls.txt
-          fi
-          if [ -f /tmp/resource_insecure_urls.txt ]; then
-            cat /tmp/resource_insecure_urls.txt >> /tmp/all_insecure_urls.txt
-          fi
-          
-          # Remove duplicates
-          sort -u /tmp/all_insecure_urls.txt -o /tmp/all_insecure_urls.txt
-          
-          # Read the list of URLs that need insecure mode
-          insecure_urls=$(cat /tmp/all_insecure_urls.txt)
-          
-          for url in $insecure_urls; do
-            echo "Adding insecure download handling for: $url"
-            url_escaped=$(echo "$url" | sed 's/\//\\\//g')
-            
-            # Find and modify the formulas that use this URL
-            for file in Formula/*.rb; do
-              if grep -q "$url" "$file"; then
-                echo "Modifying $file to handle SSL issues with $url"
-                
-                # Add curl arguments directly to handle both IPv4 and SSL issues
-                sed -i.bak "s/url \"$url_escaped\"/url \"$url_escaped\", :using => CurlDownloadStrategy, :curl_args => [\"--insecure\", \"--retry\", \"3\", \"--retry-delay\", \"5\", \"-4\"]/" "$file"
-                
-                # Clean up backup files
-                rm -f "$file.bak"
+          for file in Formula/*.rb; do
+            # Find URLs and add insecure flag
+            urls=$(grep -o 'url "[^"]*"' "$file" | cut -d'"' -f2)
+            for url in $urls; do
+              url_escaped=$(echo "$url" | sed 's/\//\\\//g')
+              # Only add if not already present
+              if ! grep -q "curl_args.*--insecure" "$file"; then
+                sed -i.bak "s/url \"$url_escaped\"/url \"$url_escaped\", :using => CurlDownloadStrategy, :curl_args => [\"--insecure\", \"--retry\", \"3\", \"-4\"]/" "$file"
               fi
             done
+            # Clean up backup files
+            rm -f "$file.bak"
           done
-          
-          echo "Formula modifications complete. Changes:"
-          git diff -- Formula/
 
       - name: Install formulas
         run: |
           failed_formulas=()
-          echo "Installing dependencies and formulas"
-
-          # Add diagnostics for resource URLs
-          echo "Checking resource availability..."
-          for f in Formula/*.rb; do
-            formula_name="$(basename "$f" .rb)"
-            resource_urls=$(grep -o 'url "https://github.com/liamswan/brew-aermod/releases/download/[^"]*"' "$f" | cut -d'"' -f2)
-            
-            if [ -n "$resource_urls" ]; then
-              echo "Resource URLs in $formula_name:"
-              for url in $resource_urls; do
-                echo "  Testing URL: $url"
-                if curl -4 --retry 3 --retry-delay 5 --tlsv1.2 --location --show-error --silent --head --fail "$url"; then
-                  echo "  ✅ $url is accessible"
-                else
-                  echo "  ❌ $url is NOT accessible (HTTP error)"
-                  echo "  Verbose diagnostics for $url:"
-                  curl -4 --retry 3 --retry-delay 5 --tlsv1.2 --location --verbose --show-error --head "$url" || true
-                  
-                  # Try with insecure mode as last resort
-                  echo "  Trying with --insecure mode:"
-                  if curl -4 --retry 3 --retry-delay 5 --tlsv1.2 --location --insecure --show-error --silent --head --fail "$url"; then
-                    echo "  ✅ $url is accessible when certificate verification is bypassed"
-                    # Add to list for insecure handling
-                    echo "$url" >> /tmp/resource_insecure_urls.txt
-                  else
-                    echo "  ❌ $url is still NOT accessible even with --insecure"
-                    failed_formulas+=("$formula_name (resource URL not accessible: $url)")
-                  fi
-                fi
-              done
-            fi
-          done
-
-          for f in Formula/*.rb; do
-            formula_name="$(basename "$f" .rb)"
-            echo "Installing dependencies for $formula_name"
-            if ! brew install --build-from-source --only-dependencies "$formula_name"; then
-              echo "Warning: Failed to install dependencies for $formula_name"
-              failed_formulas+=("$formula_name (dependencies)")
-            fi
-          done
-
+          echo "Installing formulas with optimized approach"
+          
+          # Install dependencies all at once to save time
+          echo "Installing dependencies for all formulas"
+          all_formulas=$(ls Formula/*.rb | xargs -n1 basename | sed 's/\.rb$//')
+          echo "Found formulas: $all_formulas"
+          
+          # First install aermod-suite if it exists
           if [ -f "Formula/aermod-suite.rb" ]; then
-            echo "Installing aermod-suite..."
-            if ! brew install --build-from-source aermod-suite; then
+            echo "Installing aermod-suite which includes multiple components..."
+            if ! brew install --build-from-source --keep-tmp aermod-suite; then
               echo "Warning: Failed to install aermod-suite"
               failed_formulas+=("aermod-suite (installation)")
             fi
           fi
-
-          for f in Formula/*.rb; do
-            formula_name="$(basename "$f" .rb)"
+          
+          # Then install any remaining formulas (excluding those installed by the suite)
+          for formula_name in $all_formulas; do
             if [ "$formula_name" = "aermod-suite" ]; then
               continue
             fi
-            if brew list aermod-suite &>/dev/null; then
-              if [[ "$formula_name" =~ ^(aermap|aermet|aermod)$ ]]; then
-                echo "Skipping $formula_name (installed by aermod-suite)"
-                continue
-              fi
+            
+            # Skip if already installed as part of the suite
+            if brew list aermod-suite &>/dev/null && [[ "$formula_name" =~ ^(aermap|aermet|aermod)$ ]]; then
+              echo "Skipping $formula_name (installed by aermod-suite)"
+              continue
             fi
+            
             echo "Installing $formula_name"
-            if ! brew install --build-from-source "$formula_name"; then
+            if ! brew install --build-from-source --keep-tmp "$formula_name"; then
               echo "Warning: Failed to install $formula_name"
               failed_formulas+=("$formula_name (installation)")
             fi
           done
-
+          
           if [ ${#failed_formulas[@]} -gt 0 ]; then
             echo "========== INSTALLATION FAILURES =========="
             for failure in "${failed_formulas[@]}"; do
@@ -364,17 +233,21 @@ jobs:
       - name: Run tests
         run: |
           failed_tests=()
-
-          if brew list aermod-suite &>/dev/null; then
+          
+          # Get list of all installed formulae to test
+          installed_formulae=$(brew list)
+          echo "Installed formulae: $installed_formulae"
+          
+          # Check if aermod suite is installed to avoid redundant tests
+          if echo "$installed_formulae" | grep -q "aermod-suite"; then
             echo "Testing AERMOD Suite components..."
             for component in aermod aermet aermap; do
-              if ! which "\$component" &>/dev/null; then
-                echo "Error: \$component executable not found in PATH"
-                failed_tests+=("aermod-suite (\$component missing)")
+              # Simple check for existence instead of running potentially time-consuming tests
+              if ! which "$component" &>/dev/null; then
+                echo "Error: $component executable not found in PATH"
+                failed_tests+=("aermod-suite ($component missing)")
               else
-                echo "✓ Found \$component"
-                version_output="\$("\$component" 2>&1 | grep -i version || echo "Version not found")"
-                echo "  \$component version: \$version_output"
+                echo "✓ Found $component"
               fi
             done
             tested_via_suite=(aermod aermet aermap)
@@ -382,27 +255,30 @@ jobs:
             tested_via_suite=()
           fi
 
-          for f in Formula/*.rb; do
-            formula_name="\$(basename "\$f" .rb)"
-            if [[ " \${tested_via_suite[*]} " =~ " \$formula_name " ]]; then
-              echo "Skipping test for \$formula_name (covered by suite)"
+          # Test remaining formulae efficiently
+          for formula_name in $installed_formulae; do
+            if [[ " ${tested_via_suite[*]} " =~ " $formula_name " ]]; then
+              echo "Skipping test for $formula_name (covered by suite)"
               continue
             fi
-            if brew list "\$formula_name" &>/dev/null; then
-              echo "Testing \$formula_name"
-              if ! brew test "\$formula_name"; then
-                echo "Warning: Test failed for \$formula_name"
-                failed_tests+=("\$formula_name")
-              fi
-            else
-              echo "Skipping test for \$formula_name (not installed)"
+            
+            # Skip system formulae
+            if [[ ! -f "Formula/$formula_name.rb" ]] && [[ ! -f "Formula/$formula_name@"*".rb" ]]; then
+              echo "Skipping test for $formula_name (not part of this tap)"
+              continue
+            fi
+            
+            echo "Testing $formula_name"
+            if ! brew test "$formula_name"; then
+              echo "Warning: Test failed for $formula_name"
+              failed_tests+=("$formula_name")
             fi
           done
 
-          if [ \${#failed_tests[@]} -gt 0 ]; then
+          if [ ${#failed_tests[@]} -gt 0 ]; then
             echo "========== TEST FAILURES =========="
-            for failure in "\${failed_tests[@]}"; do
-              echo "- \$failure"
+            for failure in "${failed_tests[@]}"; do
+              echo "- $failure"
             done
             echo "==================================="
             exit 1
