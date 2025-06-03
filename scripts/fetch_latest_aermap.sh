@@ -92,15 +92,21 @@ fi
 
 # Create a properly encoded URL for the source code
 URL="${BASE_URL}/aermap_source.zip"
+EXE_URL="${BASE_URL}/aermap_exe.zip"
 
 mkdir -p downloads checksums
 
 out_zip="downloads/aermap_${VERSION}.zip"
+out_exe_zip="downloads/aermap_exe_${VERSION}.zip"
 
-echo "Downloading AERMAP version $VERSION from $URL..."
+echo "Downloading AERMAP source version $VERSION from $URL..."
 
-# Download the file, allow insecure connections
+# Download the source file, allow insecure connections
 curl -k -L --output "$out_zip" "$URL" || error_exit "Failed to download $URL"
+
+# Download the executable file (which contains grid shift files)
+echo "Downloading AERMAP executable version $VERSION from $EXE_URL..."
+curl -k -L --output "$out_exe_zip" "$EXE_URL" || error_exit "Failed to download $EXE_URL"
 
 # Check if the downloaded file is valid (not empty and not an HTML error page)
 if [[ ! -s "$out_zip" ]]; then
@@ -112,7 +118,7 @@ if grep -q "<!DOCTYPE html>" "$out_zip"; then
   error_exit "Downloaded file appears to be an HTML page, not a ZIP file. The URL may be incorrect or the server may be returning an error."
 fi
 
-# Generate SHA256 checksum
+# Generate SHA256 checksum for source zip
 if [[ "$OSTYPE" == "darwin"* ]]; then
   # macOS
   CHECKSUM=$(shasum -a 256 "$out_zip" | awk '{print $1}')
@@ -120,6 +126,13 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     error_exit "Failed to calculate checksum on macOS"
   fi
   echo "$CHECKSUM" > "checksums/aermap_${VERSION}.sha256"
+  
+  # Calculate checksum for executable zip as well
+  EXE_CHECKSUM=$(shasum -a 256 "$out_exe_zip" | awk '{print $1}')
+  if [[ -z "$EXE_CHECKSUM" ]]; then
+    error_exit "Failed to calculate checksum for executable zip on macOS"
+  fi
+  echo "$EXE_CHECKSUM" > "checksums/aermap_exe_${VERSION}.sha256"
 else
   # Linux
   CHECKSUM=$(sha256sum "$out_zip" | awk '{print $1}')
@@ -127,10 +140,19 @@ else
     error_exit "Failed to calculate checksum on Linux"
   fi
   echo "$CHECKSUM" > "checksums/aermap_${VERSION}.sha256"
+  
+  # Calculate checksum for executable zip as well
+  EXE_CHECKSUM=$(sha256sum "$out_exe_zip" | awk '{print $1}')
+  if [[ -z "$EXE_CHECKSUM" ]]; then
+    error_exit "Failed to calculate checksum for executable zip on Linux"
+  fi
+  echo "$EXE_CHECKSUM" > "checksums/aermap_exe_${VERSION}.sha256"
 fi
 
 echo "Downloaded $out_zip and wrote checksum to checksums/aermap_${VERSION}.sha256"
 echo "Checksum: $CHECKSUM"
+echo "Downloaded $out_exe_zip and wrote checksum to checksums/aermap_exe_${VERSION}.sha256"
+echo "Exe Checksum: $EXE_CHECKSUM"
 
 echo "Add the new files to git:" >&2
-echo "  git add $out_zip checksums/aermap_${VERSION}.sha256" >&2
+echo "  git add $out_zip $out_exe_zip checksums/aermap_${VERSION}.sha256 checksums/aermap_exe_${VERSION}.sha256" >&2

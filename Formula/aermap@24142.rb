@@ -9,12 +9,19 @@ class AermapAT24142 < Formula
 
   option "without-bounds-check", "Disable runtime bounds checking"
   option "with-version", "Specify a version to install (e.g., --with-version=24142)"
+  option "without-grid-shift-files", "Don't install NAD83 grid shift files for DEM data conversion"
 
   depends_on "gcc" => :build
 
   resource "aermap_24142" do
     url "https://github.com/liamswan/homebrew-aermod/releases/download/v20250601/aermap_24142.zip"
     sha256 "4b34b39fe0039db114e3e78e3b6faa4797a5f8ee8ca0771db030a9b93ab3bed6"
+  end
+  
+  resource "aermap_exe" do
+    url "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_exe.zip"
+    version "24142"
+    sha256 "613f7e00815365ea4824f97fa64fd819353c119869bd04a069cb8a9db1ce45fe"
   end
 
   def install
@@ -98,11 +105,43 @@ class AermapAT24142 < Formula
 
     # Install
     bin.install "aermap"
+    
+    # Install grid shift files and readme if the option is not disabled
+    unless build.without? "grid-shift-files"
+      resource("aermap_exe").stage do
+        # Install readme and grid shift files
+        doc.install "aermap_readme.txt"
+        
+        # Install grid shift files to share directory for access during runtime
+        grid_shift_dir = share/"aermap/grid_shift_files"
+        grid_shift_dir.mkpath
+        
+        grid_shift_files = [
+          "alaska.las", "alaska.los",
+          "conus.las", "conus.los",
+          "hawaii.las", "hawaii.los",
+          "prvi.las", "prvi.los",
+          "stgeorge.las", "stgeorge.los",
+          "stlrnc.las", "stlrnc.los",
+          "stpaul.las", "stpaul.los"
+        ]
+        
+        grid_shift_files.each do |file|
+          grid_shift_dir.install file
+        end
+      end
+    end
   end
 
   test do
     assert_predicate bin/"aermap", :executable?
     assert_match "AERMAP", shell_output("#{bin}/aermap -h 2>&1", 1)
+    
+    # Check if grid shift files are installed (if option not disabled)
+    unless build.without? "grid-shift-files"
+      assert_predicate share/"aermap/grid_shift_files/conus.las", :exist?
+      assert_predicate doc/"aermap_readme.txt", :exist?
+    end
   end
 
   def resource_exists?(name)

@@ -3,19 +3,33 @@ class AermodSuite < Formula
   # AERMOD Suite with components: AERMOD 24142, AERMET 24142, AERMAP 24142
   desc "Meta-formula to install AERMOD and its preprocessors (AERMET, AERMAP)"
   homepage "https://www.epa.gov/scram"
-  # This URL will be dynamically updated by the GitHub Actions workflow.
-  # It points to the correct repository 'homebrew-aermod'.
-  # The tag (v00000000) and filename (aermod-suite-0000.tar.gz) are placeholders.
-  url "https://github.com/liamswan/homebrew-aermod/releases/download/v20250601/aermod-suite-24142.tar.gz"
-  sha256 "85cea451eec057fa7e734548ca3ba6d779ed5836a3f9de14b8394575ef0d7d8e"
-  license :public_domain # SHA256 for an empty tarball
+  url "https://github.com/liamswan/homebrew-aermod/raw/main/README.md"
+  version "24142"
+  sha256 "608ab0e3f137dd1a5cfe13b0fbbc46815d75775950d43b11bafd0021e9455f22"
+  license :public_domain
 
-  depends_on "aermap"
-  depends_on "aermet"
-  depends_on "aermod"
+  depends_on "liamswan/aermod/aermap"
+  depends_on "liamswan/aermod/aermet"
+  depends_on "liamswan/aermod/aermod"
 
   def install
-    pkgshare.install "README.md" if File.exist? "README.md"
+    # Create a placeholder file to mark installation
+    (prefix/"aermod-suite-#{version}.txt").write "AERMOD Suite #{version} - Meta-formula including AERMOD, AERMET, and AERMAP\n"
+    # Install README.md if it exists
+    prefix.install "README.md" if File.exist?("README.md")
+  end
+  
+  def caveats
+    <<~EOS
+      This package installs AERMOD, AERMET, and AERMAP executables.
+      
+      AERMAP has been installed with NAD83 grid shift files for DEM data conversion.
+      These files are located in:
+        #{HOMEBREW_PREFIX}/share/aermap/grid_shift_files/
+      
+      For more information, see:
+        #{HOMEBREW_PREFIX}/share/doc/aermap/aermap_readme.txt
+    EOS
   end
 
   test do
