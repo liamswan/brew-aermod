@@ -23,8 +23,10 @@ jobs:
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
             sudo apt-get update
-            sudo apt-get install -y ca-certificates
+            sudo apt-get install -y ca-certificates curl
             sudo update-ca-certificates
+            # Create a directory for custom certificates if needed
+            sudo mkdir -p /usr/local/share/ca-certificates/extra
             echo "Updated CA certificates on Linux"
           elif [ "$RUNNER_OS" == "macOS" ]; then
             # On macOS, certificates are managed through the system keychain
@@ -33,6 +35,22 @@ jobs:
             echo "Checked CA certificates on macOS"
           else
             echo "Unsupported runner OS for CA certificate update"
+          fi
+          
+      - name: Configure network settings
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            # Disable IPv6 to avoid connectivity issues
+            sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+            sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+            echo "Disabled IPv6 on Linux"
+            # Show network configuration for diagnostics
+            ip addr
+            cat /etc/resolv.conf
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            # macOS network diagnostics
+            networksetup -listallnetworkservices
+            echo "Checked network configuration on macOS"
           fi
 
       - name: Setup Homebrew (official)
@@ -45,12 +63,28 @@ jobs:
           echo "HOMEBREW_NO_INSECURE_REDIRECT=1" >> $GITHUB_ENV
           echo "HOMEBREW_CURL_VERBOSE=1" >> $GITHUB_ENV
           
+          # Force IPv4 for curl
+          echo "HOMEBREW_CURL_RETRIES=3" >> $GITHUB_ENV
+          
+          # Create a curlrc file to set default options for all curl operations
+          mkdir -p ~/.curl
+          echo "ipv4" > ~/.curlrc
+          echo "retry 3" >> ~/.curlrc
+          echo "retry-delay 5" >> ~/.curlrc
+          
           # Ensure curl is available and working
           curl --version
           
-          # Explicitly tell Homebrew to use curl with proper certificate verification
+          # Explicitly tell Homebrew to use curl with proper configuration
           if [ "$RUNNER_OS" == "Linux" ]; then
             echo "HOMEBREW_CURL_PATH=$(which curl)" >> $GITHUB_ENV
+            
+            # Set SSL environment variables
+            echo "SSL_CERT_DIR=/etc/ssl/certs" >> $GITHUB_ENV
+            echo "SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt" >> $GITHUB_ENV
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            # macOS SSL configuration
+            echo "SSL_CERT_FILE=$(brew --prefix)/etc/ca-certificates/cert.pem" >> $GITHUB_ENV
           fi
 
       - name: Update Homebrew
@@ -160,17 +194,18 @@ jobs:
           failed_urls=()
           for url in "${unique_urls[@]}"; do
             echo "Testing URL: $url"
-            if curl --tlsv1.2 --location --show-error --silent --head --fail "$url"; then
+            # Force IPv4 with -4 flag and retry up to 3 times with a 5 second delay
+            if curl -4 --retry 3 --retry-delay 5 --tlsv1.2 --location --show-error --silent --head --fail "$url"; then
               echo "✅ $url is accessible"
             else
               echo "❌ $url is NOT accessible (HTTP error)"
               # Try with verbose output to diagnose certificate issues
               echo "Verbose diagnostics for $url:"
-              curl --tlsv1.2 --location --verbose --show-error --head "$url" || true
+              curl -4 --retry 3 --retry-delay 5 --tlsv1.2 --location --verbose --show-error --head "$url" || true
               
               # Try with insecure mode as last resort
               echo "Trying with --insecure mode:"
-              if curl --tlsv1.2 --location --insecure --show-error --silent --head --fail "$url"; then
+              if curl -4 --retry 3 --retry-delay 5 --tlsv1.2 --location --insecure --show-error --silent --head --fail "$url"; then
                 echo "✅ $url is accessible when certificate verification is bypassed"
                 # Make note of URLs that need special handling
                 echo "$url" >> /tmp/insecure_urls.txt
@@ -201,15 +236,28 @@ jobs:
           
       - name: Modify formulas for SSL issues (if needed)
         run: |
-          # Only run if the flag file exists
-          if [ ! -f /tmp/need_insecure_downloads ]; then
+          # Only run if one of the flag files exists
+          if [ ! -f /tmp/need_insecure_downloads ] && [ ! -f /tmp/resource_insecure_urls.txt ]; then
             echo "No SSL issues detected, skipping formula modifications."
             exit 0
           fi
+          
           echo "Modifying formulas to handle SSL issues with certain URLs..."
           
+          # Combine all URLs that need insecure mode
+          touch /tmp/all_insecure_urls.txt
+          if [ -f /tmp/insecure_urls.txt ]; then
+            cat /tmp/insecure_urls.txt >> /tmp/all_insecure_urls.txt
+          fi
+          if [ -f /tmp/resource_insecure_urls.txt ]; then
+            cat /tmp/resource_insecure_urls.txt >> /tmp/all_insecure_urls.txt
+          fi
+          
+          # Remove duplicates
+          sort -u /tmp/all_insecure_urls.txt -o /tmp/all_insecure_urls.txt
+          
           # Read the list of URLs that need insecure mode
-          insecure_urls=$(cat /tmp/insecure_urls.txt)
+          insecure_urls=$(cat /tmp/all_insecure_urls.txt)
           
           for url in $insecure_urls; do
             echo "Adding insecure download handling for: $url"
@@ -220,14 +268,8 @@ jobs:
               if grep -q "$url" "$file"; then
                 echo "Modifying $file to handle SSL issues with $url"
                 
-                # Check if the formula already uses :using and modify accordingly
-                if grep -q "url \"$url_escaped\".*:using" "$file"; then
-                  # Already has :using, just add insecure option
-                  sed -i.bak "s/\(url \"$url_escaped\".*:using\)/\1, :insecure => true/" "$file"
-                else
-                  # No :using option, add it with curl downloader and insecure option
-                  sed -i.bak "s/url \"$url_escaped\"/url \"$url_escaped\", :using => CurlDownloadStrategy, :insecure => true/" "$file"
-                fi
+                # Add curl arguments directly to handle both IPv4 and SSL issues
+                sed -i.bak "s/url \"$url_escaped\"/url \"$url_escaped\", :using => CurlDownloadStrategy, :curl_args => [\"--insecure\", \"--retry\", \"3\", \"--retry-delay\", \"5\", \"-4\"]/" "$file"
                 
                 # Clean up backup files
                 rm -f "$file.bak"
@@ -253,13 +295,23 @@ jobs:
               echo "Resource URLs in $formula_name:"
               for url in $resource_urls; do
                 echo "  Testing URL: $url"
-                if curl --tlsv1.2 --location --show-error --silent --head --fail "$url"; then
+                if curl -4 --retry 3 --retry-delay 5 --tlsv1.2 --location --show-error --silent --head --fail "$url"; then
                   echo "  ✅ $url is accessible"
                 else
                   echo "  ❌ $url is NOT accessible (HTTP error)"
                   echo "  Verbose diagnostics for $url:"
-                  curl --tlsv1.2 --location --verbose --show-error --head "$url" || true
-                  failed_formulas+=("$formula_name (resource URL not accessible: $url)")
+                  curl -4 --retry 3 --retry-delay 5 --tlsv1.2 --location --verbose --show-error --head "$url" || true
+                  
+                  # Try with insecure mode as last resort
+                  echo "  Trying with --insecure mode:"
+                  if curl -4 --retry 3 --retry-delay 5 --tlsv1.2 --location --insecure --show-error --silent --head --fail "$url"; then
+                    echo "  ✅ $url is accessible when certificate verification is bypassed"
+                    # Add to list for insecure handling
+                    echo "$url" >> /tmp/resource_insecure_urls.txt
+                  else
+                    echo "  ❌ $url is still NOT accessible even with --insecure"
+                    failed_formulas+=("$formula_name (resource URL not accessible: $url)")
+                  fi
                 fi
               done
             fi
