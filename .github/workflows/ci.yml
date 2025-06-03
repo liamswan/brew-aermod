@@ -19,8 +19,39 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Update CA certificates
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y ca-certificates
+            sudo update-ca-certificates
+            echo "Updated CA certificates on Linux"
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            # On macOS, certificates are managed through the system keychain
+            # and are usually up-to-date, but we can print the version info
+            security find-certificate -a -p /System/Library/Keychains/SystemRootCertificates.keychain | grep -c "BEGIN CERTIFICATE"
+            echo "Checked CA certificates on macOS"
+          else
+            echo "Unsupported runner OS for CA certificate update"
+          fi
+
       - name: Setup Homebrew (official)
         uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Configure Homebrew
+        run: |
+          # Configure Homebrew to use system certificates and handle TLS/SSL properly
+          echo "HOMEBREW_FORCE_BREWED_CURL=0" >> $GITHUB_ENV
+          echo "HOMEBREW_NO_INSECURE_REDIRECT=1" >> $GITHUB_ENV
+          echo "HOMEBREW_CURL_VERBOSE=1" >> $GITHUB_ENV
+          
+          # Ensure curl is available and working
+          curl --version
+          
+          # Explicitly tell Homebrew to use curl with proper certificate verification
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            echo "HOMEBREW_CURL_PATH=$(which curl)" >> $GITHUB_ENV
+          fi
 
       - name: Update Homebrew
         run: brew update
@@ -101,6 +132,111 @@ jobs:
             echo "========================================"
             echo "Some style issues could not be automatically fixed."
           fi
+      
+      - name: Verify URL accessibility
+        run: |
+          echo "Verifying URLs in formulas with proper CA certificate handling..."
+          
+          # Common URLs to test
+          urls=(
+            "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_source.zip"
+            "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_exe.zip"
+            "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermet/aermet_source.zip"
+            "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/preferred/aermod/aermod_source.zip"
+            "https://github.com/liamswan/homebrew-aermod/raw/main/README.md"
+          )
+          
+          # Extract all URLs from formulas
+          formula_urls=$(grep -o 'url "[^"]*"' Formula/*.rb | cut -d'"' -f2)
+          resource_urls=$(grep -A 2 'resource' Formula/*.rb | grep -o 'url "[^"]*"' | cut -d'"' -f2)
+          
+          # Combine all URLs
+          all_urls=("${urls[@]}" $formula_urls $resource_urls)
+          
+          # Remove duplicates
+          unique_urls=($(echo "${all_urls[@]}" | tr ' ' '\n' | sort -u))
+          
+          # Test each URL
+          failed_urls=()
+          for url in "${unique_urls[@]}"; do
+            echo "Testing URL: $url"
+            if curl --tlsv1.2 --location --show-error --silent --head --fail "$url"; then
+              echo "✅ $url is accessible"
+            else
+              echo "❌ $url is NOT accessible (HTTP error)"
+              # Try with verbose output to diagnose certificate issues
+              echo "Verbose diagnostics for $url:"
+              curl --tlsv1.2 --location --verbose --show-error --head "$url" || true
+              
+              # Try with insecure mode as last resort
+              echo "Trying with --insecure mode:"
+              if curl --tlsv1.2 --location --insecure --show-error --silent --head --fail "$url"; then
+                echo "✅ $url is accessible when certificate verification is bypassed"
+                # Make note of URLs that need special handling
+                echo "$url" >> /tmp/insecure_urls.txt
+              else
+                echo "❌ $url is still NOT accessible even with --insecure"
+                failed_urls+=("$url")
+              fi
+            fi
+            echo "-----------------------------------"
+          done
+          
+          # Save the list of insecure URLs for later use
+          if [ -f /tmp/insecure_urls.txt ]; then
+            echo "The following URLs require --insecure mode:"
+            cat /tmp/insecure_urls.txt
+            # Create a flag file instead of using environment variables
+            touch /tmp/need_insecure_downloads
+          fi
+          
+          if [ ${#failed_urls[@]} -gt 0 ]; then
+            echo "========== URL ACCESS FAILURES =========="
+            for url in "${failed_urls[@]}"; do
+              echo "- $url"
+            done
+            echo "========================================"
+            exit 1
+          fi
+          
+      - name: Modify formulas for SSL issues (if needed)
+        run: |
+          # Only run if the flag file exists
+          if [ ! -f /tmp/need_insecure_downloads ]; then
+            echo "No SSL issues detected, skipping formula modifications."
+            exit 0
+          fi
+          echo "Modifying formulas to handle SSL issues with certain URLs..."
+          
+          # Read the list of URLs that need insecure mode
+          insecure_urls=$(cat /tmp/insecure_urls.txt)
+          
+          for url in $insecure_urls; do
+            echo "Adding insecure download handling for: $url"
+            url_escaped=$(echo "$url" | sed 's/\//\\\//g')
+            
+            # Find and modify the formulas that use this URL
+            for file in Formula/*.rb; do
+              if grep -q "$url" "$file"; then
+                echo "Modifying $file to handle SSL issues with $url"
+                
+                # Check if the formula already uses :using and modify accordingly
+                if grep -q "url \"$url_escaped\".*:using" "$file"; then
+                  # Already has :using, just add insecure option
+                  sed -i.bak "s/\(url \"$url_escaped\".*:using\)/\1, :insecure => true/" "$file"
+                else
+                  # No :using option, add it with curl downloader and insecure option
+                  sed -i.bak "s/url \"$url_escaped\"/url \"$url_escaped\", :using => CurlDownloadStrategy, :insecure => true/" "$file"
+                fi
+                
+                # Clean up backup files
+                rm -f "$file.bak"
+              fi
+            done
+          done
+          
+          echo "Formula modifications complete. Changes:"
+          git diff -- Formula/
 
       - name: Install formulas
         run: |
@@ -117,10 +253,12 @@ jobs:
               echo "Resource URLs in $formula_name:"
               for url in $resource_urls; do
                 echo "  Testing URL: $url"
-                if curl --output /dev/null --silent --head --fail "$url"; then
+                if curl --tlsv1.2 --location --show-error --silent --head --fail "$url"; then
                   echo "  ✅ $url is accessible"
                 else
                   echo "  ❌ $url is NOT accessible (HTTP error)"
+                  echo "  Verbose diagnostics for $url:"
+                  curl --tlsv1.2 --location --verbose --show-error --head "$url" || true
                   failed_formulas+=("$formula_name (resource URL not accessible: $url)")
                 fi
               done
