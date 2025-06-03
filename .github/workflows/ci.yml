@@ -141,7 +141,7 @@ jobs:
           urls=(
             "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_source.zip"
             "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermap/aermap_exe.zip"
-            "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/related/aermet/aermet_source.zip"
+            "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/met/aermet/aermet_source.zip"
             "https://gaftp.epa.gov/Air/aqmg/SCRAM/models/preferred/aermod/aermod_source.zip"
             "https://github.com/liamswan/homebrew-aermod/raw/main/README.md"
           )
