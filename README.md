@@ -24,7 +24,7 @@ These tools are widely used for regulatory air quality modeling to assess the im
 ### Installing the Tap
 
 ```bash
-brew tap liamswan/homebrew-aermod
+brew tap liamswan/aermod
 ```
 
 ### Installing Individual Components
